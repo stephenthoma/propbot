@@ -11,6 +11,7 @@ query Proposal($id: String) {
     space {
       id
       name
+      members
       twitter
     }
   }
