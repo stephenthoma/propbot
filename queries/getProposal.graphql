@@ -1,0 +1,17 @@
+query Proposal($id: String) {
+  proposal(id: $id) {
+    id
+    title
+    start
+    created
+    end
+    snapshot
+    state
+    author
+    space {
+      id
+      name
+      twitter
+    }
+  }
+}
