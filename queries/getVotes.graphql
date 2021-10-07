@@ -1,0 +1,9 @@
+query Votes($id: String) {
+  votes(
+    first: 100000,
+    where:{proposal: $id}
+  ) {
+    choice
+    voter
+  }
+}

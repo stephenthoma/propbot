@@ -6,6 +6,12 @@ query Proposal($id: String) {
     created
     end
     snapshot
+    network
+    choices
+    strategies {
+      name
+      params
+    }
     state
     author
     space {

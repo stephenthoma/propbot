@@ -1,3 +1,4 @@
+import json
 from datetime import datetime
 
 import snapshot
@@ -13,16 +14,26 @@ def is_valid_proposal(proposal: dict) -> bool:
         - XXX newer than 15 minutes (frequency that the cron runs)
         - more than 10 members in the space
     """
+    with open("./explore.json", "r") as explore_fi:
+        explore = json.load(explore_fi)
     # Must be older than 15 minutes
-    # now = datetime.now()
-    # if (now - datetime.fromtimestamp(proposal["created"])).seconds > 9000:
-    #     return False
+    now = datetime.now()
+    if (now - datetime.fromtimestamp(proposal["created"])).seconds > 9000:
+        return False
 
     # Must have more than X members in the space
-    if len(proposal["space"]["members"]) < 10:
+    # if len(proposal["space"]["members"]) < 2:
+    # return False
+
+    if explore["spaces"].get(proposal["space"]["id"], {}).get("followers", 0) < 10:
         return False
 
     if proposal["space"]["id"] in BLOCKLIST:
+        return False
+
+    # Try to ignore test proposals
+    if "TEST" in proposal["title"].upper():
+        print("Ignoring proposal with test in title", prop)
         return False
 
     return True
@@ -64,5 +75,5 @@ if __name__ == "__main__":
     proposals = snapshot.get_proposals()
     govTweeter = GovTweeter()
     for prop in proposals:
-        # if is_valid_proposal(prop):
-        govTweeter.tweet_proposal(prop)
+        if is_valid_proposal(prop):
+            govTweeter.tweet_proposal(prop)
