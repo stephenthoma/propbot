@@ -5,15 +5,14 @@ import tweepy
 
 
 class GovTweeter:
-    SECRETS = {
-        "consumer_key": "wLid5ZXYbm0Ux4e7gdnLeMpRe",
-        "consumer_secret": "oJghmQYDE9NBTlD4xo2mSS9FYkrjEE75R4Jvb6hC4Hj4pabNtA",
-        "access_token": "1444758939854204930-k0ezp3yNL3tRcwszFyriWQvA5TANKr",
-        "access_secret": "bQmg95bfVyQPqfNcsMGNWTn0kVaiDWPvy73ibMeS9Yfqg",
-    }
-
     def __init__(self):
         is_production = os.environ["GOVBOT_PRODUCTION"] == "true"
+
+        consumer_key = os.environ["CONSUMER_KEY"]
+        consumer_secret = os.environ["CONSUMER_SECRET"]
+        access_token = os.environ["ACCESS_TOKEN"]
+        access_secret = os.environ["ACCESS_SECRET"]
+
         self.api = self.get_tweepy_api() if is_production else TweepyAPIMock()
 
     def tweet_proposal(self, prop: dict):
