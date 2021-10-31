@@ -18,7 +18,6 @@ query Proposals {
       id
       name
       twitter
-      members
     }
   }
 }

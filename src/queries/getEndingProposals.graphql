@@ -1,0 +1,12 @@
+query Proposals {
+  proposals(
+    first: 50,
+    skip: 0,
+    where: {state: "active"},
+    orderBy: "end",
+    orderDirection: asc
+  ) {
+    id
+    end
+  }
+}

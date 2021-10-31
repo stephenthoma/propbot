@@ -1,42 +1,21 @@
+"""
+IDEAS:
+    - weekly summary of # proposals accepted + denied, # voters overall. most active spaces?
+    - high activity proposal alert tweet. when # voters is X std deviations above average
+    - need to make an allowlist of spaces so i can more confidently turn on auto tweets
+    - consider adding cashtags to tweets?
+    - make a mapping of space name to project twitter @
+    - make a mapping of string to project twitter @ -- eg "Convex Finance" gets replaced with @convexfinance
+    - add circuit breaker to prevent @ tagging a project more than once a day
+"""
+
 import json
 from datetime import datetime
 
+import proposal_filters
+import firestore
 import snapshot
 from twitter import GovTweeter
-
-BLOCKLIST = ["upsidedao.eth"]
-
-
-def is_valid_proposal(proposal: dict) -> bool:
-    """Return True if a proposal meets all criteria, False otherwise
-
-    Current criteria:
-        - XXX newer than 15 minutes (frequency that the cron runs)
-        - more than 10 members in the space
-    """
-    with open("./explore.json", "r") as explore_fi:
-        explore = json.load(explore_fi)
-    # Must be older than 15 minutes
-    now = datetime.now()
-    if (now - datetime.fromtimestamp(proposal["created"])).seconds > 9000:
-        return False
-
-    # Must have more than X members in the space
-    # if len(proposal["space"]["members"]) < 2:
-    # return False
-
-    if explore["spaces"].get(proposal["space"]["id"], {}).get("followers", 0) < 10:
-        return False
-
-    if proposal["space"]["id"] in BLOCKLIST:
-        return False
-
-    # Try to ignore test proposals
-    if "TEST" in proposal["title"].upper():
-        print("Ignoring proposal with test in title", prop)
-        return False
-
-    return True
 
 
 def webhook_entry(req):
@@ -50,30 +29,40 @@ def webhook_entry(req):
     return {"status": "success"}
 
 
-def main(event=None, context=None):
+def cron_entry(event=None, context=None):
     """Entrypoint for the pub-sub based cloud function
 
     This cloud function will be triggered on a schedule. We will assume that it runs every 15 min.
     without fail. This lets us ignore any proposals that were created more than 15 min. ago.
     """
-    proposals = snapshot.get_proposals()
-
-    if len(proposals) == 0:
-        print("No valid proposals found to post")
-        return
-    else:
-        print(f"Found {len(proposals)} proposals")
-
+    print(event, context)
     govTweeter = GovTweeter()
+
+    ending_proposals = snapshot.get_ending_proposals()
+    for prop in ending_proposals:
+        prop = snapshot.get_proposal(prop_id["id"])  # Retrieve the full proposal record
+        if not firestore.has_contested_tweet(prop["id"]) and snapshot.is_contested_proposal(prop):
+            status = govTweeter.contested_proposal_status(prop)
+            govTweeter.update_twitter_status(status)
+
+
+def dev_get_new():
+    govTweeter = GovTweeter()
+    new_proposals = snapshot.get_latest_proposals()
+    print(new_proposals)
+    filters = [
+        proposal_filters.is_popular_space,
+    ]
+    proposals = proposal_filters.apply_filters(filters, new_proposals)
+
     for prop in proposals:
-        if is_valid_proposal(prop):
-            govTweeter.tweet_proposal(prop)
+        print(prop)
+
+        status = govTweeter.new_proposal_status(prop)
+        govTweeter.update_twitter_status(status)
 
 
 if __name__ == "__main__":
     """Used for development"""
-    proposals = snapshot.get_proposals()
-    govTweeter = GovTweeter()
-    for prop in proposals:
-        if is_valid_proposal(prop):
-            govTweeter.tweet_proposal(prop)
+    # cron_entry()
+    dev_get_new()

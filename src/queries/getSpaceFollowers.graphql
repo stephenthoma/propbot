@@ -1,0 +1,5 @@
+query SpaceFollows($id: String) {
+  follows(where: {space: $id}) {
+    follower
+  }
+}
