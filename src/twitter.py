@@ -3,54 +3,59 @@ from datetime import datetime
 
 import tweepy
 
+import snapshot
+
 
 class GovTweeter:
     def __init__(self):
         is_production = os.environ["GOVBOT_PRODUCTION"] == "true"
+        self.api = self._get_tweepy_api() if is_production else TweepyAPIMock()
 
-        consumer_key = os.environ["CONSUMER_KEY"]
-        consumer_secret = os.environ["CONSUMER_SECRET"]
-        access_token = os.environ["ACCESS_TOKEN"]
-        access_secret = os.environ["ACCESS_SECRET"]
+    def new_proposal_status(self, prop: dict) -> str:
+        """Create a string for a tweet about a new proposal"""
+        end_date_str = get_human_time(prop["end"])
+        url = snapshot.get_proposal_url(prop["space"]["id"], prop["id"])
+        name = get_space_name(prop)
 
-        self.api = self.get_tweepy_api() if is_production else TweepyAPIMock()
+        return f"⚡️ {name} proposal: \"{prop['title']}\"\n\nVoting ends {end_date_str}\n{url}"
 
-    def tweet_proposal(self, prop: dict):
-        formatted_prop = self.format_proposal_status(prop)
-        self.update_twitter_status(formatted_prop)
+    def contested_proposal_status(self, prop: dict) -> str:
+        """Create a string for a tweet about a contested proposal"""
+        end_date_str = get_human_time(prop["end"])
+        url = snapshot.get_proposal_url(prop["space"]["id"], prop["id"])
+        name = get_space_name(prop)
 
-    def format_proposal_status(self, prop: dict) -> str:
-        """The propbot tweets about governance proposals in a specific format. This function takes
-        a proposal object returned by the Snapshot GraphQL API and returns a properly formatted str
+        return f"⚔️ [contested] {name} proposal: \"{prop['title']}\"\n\nVoting ends soon {end_date_str}\n{url}"
 
-        Args:
-            prop (dict): Snapshot proposal (see the query to reference expected keys)
+    def _get_tweepy_api(self):
+        CONSUMER_KEY = os.environ["CONSUMER_KEY"]
+        CONSUMER_SECRET = os.environ["CONSUMER_SECRET"]
+        ACCESS_TOKEN = os.environ["ACCESS_TOKEN"]
+        ACCESS_SECRET = os.environ["ACCESS_SECRET"]
 
-        Returns:
-            str: The tweet ready to be tweeted
-        """
-        # URLs should be in the following format:
-        # https://snapshot.org/#/sushigov.eth/proposal/QmNT8bY7aJRFUMtfbFp9m7JHcUgEVCNZzWE67Crr9oAVrA
-        end_date_str = datetime.fromtimestamp(prop["end"]).strftime("%H:%M %b %d %Y")
-        url = f"https://snapshot.org/#/{prop['space']['id']}/proposal/{prop['id']}"
-        name = f"@{prop['space']['twitter']}" if prop["space"]["twitter"] else prop["space"]["name"]
-
-        str = f"⚡️ {name} proposal: \"{prop['title']}\"\n\nVoting ends {end_date_str}\n{url}"
-        return str
-
-    def get_tweepy_api(self):
-        auth = tweepy.OAuthHandler(self.SECRETS["consumer_key"], self.SECRETS["consumer_secret"])
-        auth.set_access_token(self.SECRETS["access_token"], self.SECRETS["access_secret"])
+        auth = tweepy.OAuthHandler(CONSUMER_KEY, CONSUMER_SECRET)
+        auth.set_access_token(ACCESS_TOKEN, ACCESS_SECRET)
         return tweepy.API(auth)
 
     def update_twitter_status(self, status: str) -> dict:
-        """Equivalent to posting a tweet"""
+        """Post a tweet"""
         result = self.api.update_status(status)
         return result
 
 
+def get_human_time(unix_time) -> str:
+    return datetime.fromtimestamp(unix_time).strftime("%H:%M %b %d %Y")
+
+
+def get_space_name(proposal) -> str:
+    # if proposal["space"]["twitter"]:
+    #     return f"@{proposal['space']['twitter']}"
+    # else:
+    return proposal["space"]["name"]
+
+
 class TweepyAPIMock:
-    """Used to mock the Tweepy API instance in development. Prints to stdout intsead of tweeting"""
+    """Used to mock the Tweepy API instance in development. Prints to stdout instead of tweeting"""
 
     def update_status(self, status):
         print("[ DEBUG ]\n", status, "\n[ DEBUG ]")
