@@ -1,7 +1,7 @@
 import typing
 from datetime import datetime
 
-import snapshot
+from govbot import snapshot
 
 BLOCKLIST = ["upsidedao.eth", "compgov.eth"]
 

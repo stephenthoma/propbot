@@ -4,14 +4,14 @@ with open("README.md", "r") as fh:
     long_description = fh.read()
 
 setup(
-    name="gov_bot",
+    name="govbot",
     version="0.0.1",
     author="Stephen Thoma",
     author_email="stephen@thoma.io",
-    description="A twitter bot that tweets about Snaphsot.org governance proposals",
+    description="A twitter bot that tweets about Snapshot.org governance proposals",
     long_description=long_description,
     long_description_content_type="text/markdown",
-    url="https://github.com/stephen_thoma/gov-bot",
+    url="https://github.com/stephen_thoma/govbot",
     packages=find_packages(),
     python_requires=">=3.9",
     install_requires=["requests", "tweepy", "google-cloud-firestore"],

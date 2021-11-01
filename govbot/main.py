@@ -12,10 +12,10 @@ IDEAS:
 import json
 from datetime import datetime
 
-import proposal_filters
-import firestore
-import snapshot
-from twitter import GovTweeter
+from govbot import proposal_filters as pf
+from govbot import firestore
+from govbot import snapshot
+from govbot.twitter import GovTweeter
 
 
 def webhook_entry(req):
@@ -40,7 +40,7 @@ def cron_entry(event=None, context=None):
 
     ending_proposals = snapshot.get_ending_proposals()
     for prop in ending_proposals:
-        prop = snapshot.get_proposal(prop_id["id"])  # Retrieve the full proposal record
+        prop = snapshot.get_proposal(prop["id"])  # Retrieve the full proposal record
         if not firestore.has_contested_tweet(prop["id"]) and snapshot.is_contested_proposal(prop):
             status = govTweeter.contested_proposal_status(prop)
             govTweeter.update_twitter_status(status)
@@ -49,11 +49,8 @@ def cron_entry(event=None, context=None):
 def dev_get_new():
     govTweeter = GovTweeter()
     new_proposals = snapshot.get_latest_proposals()
-    print(new_proposals)
-    filters = [
-        proposal_filters.is_popular_space,
-    ]
-    proposals = proposal_filters.apply_filters(filters, new_proposals)
+    filters = [pf.is_popular_space]
+    proposals = pf.apply_filters(filters, new_proposals)
 
     for prop in proposals:
         print(prop)
@@ -64,5 +61,5 @@ def dev_get_new():
 
 if __name__ == "__main__":
     """Used for development"""
-    # cron_entry()
-    dev_get_new()
+    cron_entry()
+    # dev_get_new()

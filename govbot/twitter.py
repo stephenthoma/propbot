@@ -3,7 +3,7 @@ from datetime import datetime
 
 import tweepy
 
-import snapshot
+from govbot import snapshot
 
 
 class GovTweeter:

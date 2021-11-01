@@ -8,14 +8,14 @@ CONTESTED_COLLECTION = "contested_tweets"
 AVG_SPACE_COLLECTION = "avg_space_voters"
 
 
-def get_avg_space_voters(space_id: str) -> int:
+def get_avg_space_voters(space_id: str) -> float:
     """Retrieve previously computed average voters for a space"""
     db = firestore.Client(project=GCP_PROJECT)
     doc_ref = db.collection(AVG_SPACE_COLLECTION).document(space_id)
     return doc_ref.get().to_dict()["avg_voters"]
 
 
-def store_space_avg_voters(space_id: str, avg_voters: int):
+def store_space_avg_voters(space_id: str, avg_voters: float):
     """Store average voters for a space"""
     db = firestore.Client(project=GCP_PROJECT)
     doc_ref = db.collection(AVG_SPACE_COLLECTION).document(space_id)

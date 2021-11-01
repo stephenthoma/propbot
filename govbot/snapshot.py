@@ -1,5 +1,6 @@
 import typing
 import json
+from pkg_resources import resource_filename
 
 import requests
 
@@ -62,7 +63,7 @@ def get_scores(space_id: str, strategies: list, network: str, snapshot: int, add
 
 def get_votes(proposal_id: str) -> list:
     """Get a list of all votes for a given proposal_id"""
-    with open("./queries/getVotes.graphql", "r") as fi:
+    with open(resource_filename("govbot", "queries/getVotes.graphql"), "r") as fi:
         query = fi.read()
 
     votes = run_query(query, SNAPSHOT_GRAPH_URL, variables={"id": proposal_id})
@@ -70,7 +71,7 @@ def get_votes(proposal_id: str) -> list:
 
 
 def get_latest_proposals() -> dict:
-    with open("./queries/getProposals.graphql", "r") as fi:
+    with open(resource_filename("govbot", "/queries/getProposals.graphql"), "r") as fi:
         query = fi.read()
 
     # Retrieve the last 25 proposals
@@ -80,7 +81,7 @@ def get_latest_proposals() -> dict:
 
 
 def get_ending_proposals() -> dict:
-    with open("./queries/getEndingProposals.graphql", "r") as fi:
+    with open(resource_filename("govbot", "/queries/getEndingProposals.graphql"), "r") as fi:
         query = fi.read()
 
     proposals = run_query(query, SNAPSHOT_GRAPH_URL)["data"]["proposals"]
@@ -90,23 +91,23 @@ def get_ending_proposals() -> dict:
 
 def get_proposal(id: str) -> dict:
     """Retrieve a single proposal with the id passed in"""
-    with open("./queries/getProposal.graphql", "r") as fi:
+    with open(resource_filename("govbot", "/queries/getProposal.graphql"), "r") as fi:
         query = fi.read()
 
     return run_query(query, SNAPSHOT_GRAPH_URL, variables={"id": id})["data"]["proposal"]
 
 
-def get_proposal_url(space_id: str, proposal_id: str) -> str:
-    """Get the URL of the proposal on the Snapshot website"""
-    return f"https://snapshot.org/#/{space_id}/proposal/{proposal_id}"
-
-
 def get_space_followers(space_id: str) -> list:
     """Retrieve list of follower ids for a space"""
-    with open("./queries/getSpaceFollowers.graphql", "r") as fi:
+    with open(resource_filename("govbot", "/queries/getSpaceFollowers.graphql"), "r") as fi:
         query = fi.read()
 
     return run_query(query, SNAPSHOT_GRAPH_URL, variables={"id": space_id})["data"]["follows"]
+
+
+def get_proposal_url(space_id: str, proposal_id: str) -> str:
+    """Get the URL of the proposal on the Snapshot website"""
+    return f"https://snapshot.org/#/{space_id}/proposal/{proposal_id}"
 
 
 def run_query(query: str, url: str, headers: dict = None, variables: dict = None) -> dict:
