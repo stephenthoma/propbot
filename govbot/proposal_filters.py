@@ -1,9 +1,9 @@
+import json
 import typing
 from datetime import datetime, timedelta
+from pkg_resources import resource_filename
 
 from govbot import snapshot, firestore, twitter
-
-BLOCKLIST = ["upsidedao.eth", "compgov.eth"]
 
 
 def apply_filters(filters: typing.List[typing.Callable], proposals):
@@ -17,11 +17,15 @@ def apply_filters(filters: typing.List[typing.Callable], proposals):
 
 
 def has_recently_tweeted_space(proposal: dict) -> bool:
-    cutoff_delta = timedelta(days=1)
     space_name = twitter.get_space_name(proposal)
 
     govTweeter = twitter.GovTweeter()
-    return not govTweeter.has_recently_tweeted(space_name, cutoff_delta)
+    return not govTweeter.has_recently_tweeted(space_name, timedelta(days=1))
+
+
+def has_already_tweeted_prop(proposal: dict) -> bool:
+    govTweeter = twitter.GovTweeter()
+    return not govTweeter.has_recently_tweeted(proposal["title"], timedelta(days=10))
 
 
 def is_new_proposal(proposal):
@@ -75,7 +79,11 @@ def is_high_activity_proposal(proposal: dict) -> bool:
 
 
 def is_allowed_space(proposal):
-    if proposal["space"]["id"] not in BLOCKLIST:
+    """The list of allowed spaces is all spaces with more than 3 proposals + >10 avg voters"""
+    with open(resource_filename("govbot", "allowed_spaces.json"), "r") as fi:
+        spaces = json.load(fi)
+
+    if proposal["space"]["id"] in spaces:
         return True
 
 
