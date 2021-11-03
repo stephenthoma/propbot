@@ -61,9 +61,14 @@ def is_high_activity_proposal(proposal: dict) -> bool:
 
     This considers whether the proposal has:
         - more than an arbitrary threshold of voters (currently 10)
-        - more than a std. deviation from avg activity for proposals in the space
+        - more than 30% above avg activity for proposals in the space
     """
-    if len(snapshot.get_votes(proposal["id"])) < 10:
+    num_votes = len(snapshot.get_votes(proposal["id"]))
+    if num_votes < 10:
+        return False
+
+    avg_voters = firestore.get_avg_space_voters(proposal["space"]["id"])
+    if num_votes < avg_voters * 1.3:
         return False
 
     return True
