@@ -65,10 +65,10 @@ def get_human_time(unix_time) -> str:
 
 
 def get_space_name(proposal: dict) -> str:
-    # if proposal["space"]["twitter"]:
-    #     return f"@{proposal['space']['twitter']}"
-    # else:
-    return proposal["space"]["name"]
+    if proposal["space"]["twitter"]:
+        return f"@{proposal['space']['twitter']}"
+    else:
+        return proposal["space"]["name"]
 
 
 class TweepyAPIMock:
