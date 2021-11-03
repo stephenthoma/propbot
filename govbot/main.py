@@ -44,6 +44,7 @@ def cron_entry(event=None, context=None):
         if not firestore.has_contested_tweet(prop["id"]) and snapshot.is_contested_proposal(prop):
             status = govTweeter.contested_proposal_status(prop)
             govTweeter.update_twitter_status(status)
+            firestore.store_contested_proposal_tweet(prop["id"])
 
 
 def dev_get_new():

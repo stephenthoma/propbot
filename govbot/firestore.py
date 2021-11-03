@@ -35,7 +35,7 @@ def get_contested_tweet_proposals() -> list:
     return doc_ref.get().to_dict()["ids"]
 
 
-def add_contested_tweet_proposal(proposal_id: str):
+def store_contested_proposal_tweet(proposal_id: str):
     current_ids = get_contested_tweet_proposals()
     update_ids = current_ids + [proposal_id]
 
