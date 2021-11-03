@@ -39,9 +39,16 @@ def cron_entry(event=None, context=None):
     govTweeter = GovTweeter()
 
     ending_proposals = snapshot.get_ending_proposals()
-    for prop in ending_proposals:
-        prop = snapshot.get_proposal(prop["id"])  # Retrieve the full proposal record
-        if not firestore.has_contested_tweet(prop["id"]) and snapshot.is_contested_proposal(prop):
+    filters = [
+        pf.is_allowed_space,
+        pf.is_popular_space,
+        pf.has_blocked_words,
+        pf.is_contested_proposal,
+    ]
+
+    filtered_proposals = pf.apply_filters(filters, ending_proposals)
+    for prop in filtered_proposals:
+        if not firestore.has_contested_tweet(prop["id"]):
             status = govTweeter.contested_proposal_status(prop)
             govTweeter.update_twitter_status(status)
             firestore.store_contested_proposal_tweet(prop["id"])
@@ -50,7 +57,7 @@ def cron_entry(event=None, context=None):
 def dev_get_new():
     govTweeter = GovTweeter()
     new_proposals = snapshot.get_latest_proposals()
-    filters = [pf.is_popular_space]
+    filters = [pf.is_new_proposal, pf.is_allowed_space, pf.is_popular_space, pf.has_blocked_words]
     proposals = pf.apply_filters(filters, new_proposals)
 
     for prop in proposals:
