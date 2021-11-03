@@ -1,5 +1,6 @@
 import os
-from datetime import datetime
+import datetime
+import pytz
 
 import tweepy
 
@@ -42,12 +43,28 @@ class GovTweeter:
         result = self.api.update_status(status)
         return result
 
+    def get_recent_tweets(self, count=25):
+        return self.api.user_timeline(count=count)
+
+    def has_recently_tweeted(self, search_str: str, cutoff_delta: datetime.timedelta) -> bool:
+        cutoff_time = pytz.utc.localize(datetime.datetime.now() - cutoff_delta)
+
+        tweets = self.get_recent_tweets()
+        if tweets[-1].created_at > cutoff_time:
+            # TODO: Improve this retrieval logic lol
+            tweets = self.get_recent_tweets(count=50)
+            assert tweets[-1].created_at <= cutoff_time
+
+        included_tweets = [t for t in tweets if t.created_at >= cutoff_time]
+        filtered_tweets = [t for t in included_tweets if search_str in t.text]
+        return len(filtered_tweets) > 0
+
 
 def get_human_time(unix_time) -> str:
-    return datetime.fromtimestamp(unix_time).strftime("%H:%M %b %d %Y")
+    return datetime.datetime.fromtimestamp(unix_time).strftime("%H:%M %b %d %Y")
 
 
-def get_space_name(proposal) -> str:
+def get_space_name(proposal: dict) -> str:
     # if proposal["space"]["twitter"]:
     #     return f"@{proposal['space']['twitter']}"
     # else:

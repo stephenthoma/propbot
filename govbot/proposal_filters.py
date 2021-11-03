@@ -1,7 +1,7 @@
 import typing
-from datetime import datetime
+from datetime import datetime, timedelta
 
-from govbot import snapshot
+from govbot import snapshot, firestore, twitter
 
 BLOCKLIST = ["upsidedao.eth", "compgov.eth"]
 
@@ -14,6 +14,14 @@ def apply_filters(filters: typing.List[typing.Callable], proposals):
     for fil in filters:
         proposals = filter(fil, proposals)
     return proposals
+
+
+def has_recently_tweeted_space(proposal: dict) -> bool:
+    cutoff_delta = timedelta(days=1)
+    space_name = twitter.get_space_name(proposal)
+
+    govTweeter = twitter.GovTweeter()
+    return not govTweeter.has_recently_tweeted(space_name, cutoff_delta)
 
 
 def is_new_proposal(proposal):
@@ -75,7 +83,7 @@ def is_popular_space(proposal):
 def has_blocked_words(proposal):
     """A crude attempt to avoid tweeting about test proposals"""
     if "TEST" in proposal["title"].upper():
-        print("Ignoring proposal with test in title", proposal)
+        print("Ignoring proposal with test in title", proposal["title"])
         return False
 
     return True
