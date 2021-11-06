@@ -140,7 +140,7 @@ def run_query(query: str, url: str, headers: dict = None, variables: dict = None
     try:
         res.raise_for_status()
     except requests.HTTPError as err:
-        print(res.text)
+        print("Error: Got bad status code in GraphQL query response:", res.text)
         raise err
 
     return res.json()

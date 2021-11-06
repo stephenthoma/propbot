@@ -19,7 +19,7 @@ def get_avg_space_voters(space_id: str) -> float:
     if doc_val.exists is True:
         return doc_val.to_dict()["avg_voters"]
     else:
-        print(f"ERROR: Did not have average space voters stored for {space_id}")
+        print(f"Error: Did not have average space voters stored for {space_id}")
         return 10000.0
 
 
