@@ -3,9 +3,30 @@ import json
 from pkg_resources import resource_filename
 
 import requests
+from sgqlc.operation import Operation
+
+from snapshot_schema import snapshot_schema as ss
 
 SNAPSHOT_GRAPH_URL = "https://hub.snapshot.org/graphql"
 SNAPSHOT_SCORE_API = "https://score.snapshot.org/api/scores"
+
+PROPOSAL_FIELDS = [
+    "id",
+    "title",
+    "start",
+    "created",
+    "end",
+    "snapshot",
+    "network",
+    "state",
+    "author",
+    "choices",
+]
+PROPOSAL_SPACE_FIELDS = [
+    "id",
+    "name",
+    "twitter",
+]
 
 
 def get_proposal_results(proposal: dict) -> typing.Optional[typing.Dict[str, float]]:
@@ -61,53 +82,55 @@ def get_scores(space_id: str, strategies: list, network: str, snapshot: int, add
         return res_json["result"]["scores"]
 
 
-def get_votes(proposal_id: str) -> list:
-    """Get a list of all votes for a given proposal_id"""
-    with open(resource_filename("govbot", "queries/getVotes.graphql"), "r") as fi:
-        query = fi.read()
-
-    votes = run_query(query, SNAPSHOT_GRAPH_URL, variables={"id": proposal_id})
-    return votes["data"]["votes"]
+def get_votes(proposal_id: str) -> list[ss.Vote]:
+    op = Operation(ss.Query)
+    op_votes = op.votes(where={"proposal": proposal_id}, first=10000)
+    op_votes.__fields__("choice", "voter")
+    return run_operation(op).votes
 
 
-def get_latest_proposals() -> dict:
-    with open(resource_filename("govbot", "/queries/getProposals.graphql"), "r") as fi:
-        query = fi.read()
-
-    # Retrieve the last 25 proposals
-    proposals = run_query(query, SNAPSHOT_GRAPH_URL)["data"]["proposals"]
-
-    return proposals
-
-
-def get_ending_proposals() -> dict:
-    with open(resource_filename("govbot", "/queries/getEndingProposals.graphql"), "r") as fi:
-        query = fi.read()
-
-    proposals = run_query(query, SNAPSHOT_GRAPH_URL)["data"]["proposals"]
-
-    return proposals
+def get_ending_proposals() -> list[ss.Proposal]:
+    op = Operation(ss.Query, name="getEndingProposals")
+    op_proposals = op.proposals(
+        first=50, where={"state": "active"}, order_by="end", order_direction="asc"
+    )
+    op_proposals.__fields__(*PROPOSAL_FIELDS)
+    op_proposals.space().__fields__(*PROPOSAL_SPACE_FIELDS)
+    return run_operation(op).proposals
 
 
-def get_proposal(id: str) -> dict:
-    """Retrieve a single proposal with the id passed in"""
-    with open(resource_filename("govbot", "/queries/getProposal.graphql"), "r") as fi:
-        query = fi.read()
+def get_proposal(proposal_id: str) -> ss.Proposal:
+    op = Operation(ss.Query, name="getProposal")
+    op_proposal = op.proposal(id=proposal_id)
+    op_proposal.__fields__(*PROPOSAL_FIELDS)
+    op_proposal.space().__fields__(*PROPOSAL_SPACE_FIELDS)
+    return run_operation(op).proposal
 
-    return run_query(query, SNAPSHOT_GRAPH_URL, variables={"id": id})["data"]["proposal"]
+
+def get_latest_proposals() -> list[ss.Proposal]:
+    op = Operation(ss.Query, name="getProposals")
+    op_proposals = op.proposals(
+        first=25, where={"state": "open"}, order_by="created", order_direction="desc"
+    )
+    op_proposals.__fields__(*PROPOSAL_FIELDS)
+    op_proposals.space().__fields__(*PROPOSAL_SPACE_FIELDS)
+    return run_operation(op).proposals
 
 
-def get_space_followers(space_id: str) -> list:
-    """Retrieve list of follower ids for a space"""
-    with open(resource_filename("govbot", "/queries/getSpaceFollowers.graphql"), "r") as fi:
-        query = fi.read()
-
-    return run_query(query, SNAPSHOT_GRAPH_URL, variables={"id": space_id})["data"]["follows"]
+def get_space_follows(space_id: str) -> list[ss.Follow]:
+    op = Operation(ss.Query, name="getSpaceFollows")
+    op_follows = op.follows(where={"space": space_id})
+    op_follows.follower()
+    return run_operation(op)
 
 
 def get_proposal_url(space_id: str, proposal_id: str) -> str:
     """Get the URL of the proposal on the Snapshot website"""
     return f"https://snapshot.org/#/{space_id}/proposal/{proposal_id}"
+
+
+def run_operation(op, variables: dict = None):
+    return op + run_query(str(op), SNAPSHOT_GRAPH_URL, variables)
 
 
 def run_query(query: str, url: str, headers: dict = None, variables: dict = None) -> dict:
