@@ -1,6 +1,8 @@
+import datetime
 import typing
 import json
 from pkg_resources import resource_filename
+from collections import defaultdict, Counter
 
 import requests
 from sgqlc.operation import Operation
@@ -122,6 +124,30 @@ def get_space_follows(space_id: str) -> list[ss.Follow]:
     op_follows = op.follows(where={"space": space_id})
     op_follows.follower()
     return run_operation(op)
+
+
+def get_week_summary() -> dict:
+    """Get a summary of activity on the snapshot platform from the last week"""
+    a_week_ago = int((datetime.datetime.now() - datetime.timedelta(days=7)).timestamp())
+    op = Operation(ss.Query)
+    op_votes = op.votes(where={"created_gte": a_week_ago}, first=10e5)
+    op_votes.id()
+
+    op_proposals = op.proposals(where={"created_gte": a_week_ago}, first=10e5)
+    op_proposals.id()
+
+    op_follows = op.follows(where={"created_gte": a_week_ago}, first=10e5)
+    op_follows.space().id()
+    op_follows.space().name()
+
+    res = run_operation(op)
+
+    counts = Counter([f.space.name for f in res.follows])
+    return {
+        "num_votes": len(res.votes),
+        "num_proposals": len(res.proposals),
+        "top_growth_spaces": counts.most_common(3),
+    }
 
 
 def get_proposal_url(space_id: str, proposal_id: str) -> str:

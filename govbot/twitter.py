@@ -40,6 +40,18 @@ class GovTweeter:
 
         return f'⚔️ [contested] {name} proposal: "{proposal.title}"\n\nVoting ends soon {end_date_str}\n{url}'
 
+    def weekly_summary_status(self) -> str:
+        stats = snapshot.get_week_summary()
+
+        return (
+            f'📈 [weekly summary]\n- {stats["num_proposals"]:,} new proposals'
+            f'\n- {stats["num_votes"]:,} votes cast\n\n'
+            f"Fastest growing spaces:\n"
+            f'- {stats["top_growth_spaces"][0][0]}: +{stats["top_growth_spaces"][0][1]:,} followers\n'
+            f'- {stats["top_growth_spaces"][1][0]}: +{stats["top_growth_spaces"][1][1]:,} followers\n'
+            f'- {stats["top_growth_spaces"][2][0]}: +{stats["top_growth_spaces"][2][1]:,} followers'
+        )
+
     def update_twitter_status(self, status: str):
         if self.is_production:
             result = self.api.update_status(status)
