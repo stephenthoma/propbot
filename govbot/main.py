@@ -26,6 +26,16 @@ def webhook_entry(req):
         govTweeter = GovTweeter()
         govTweeter.tweet_proposal(prop)
 
+    filters = [
+        pf.is_old_proposal,
+        pf.has_blocked_words,
+        pf.is_blocked_space,
+        pf.is_low_follower_space,
+        pf.has_recently_tweeted_space,
+        pf.has_already_tweeted_prop,
+    ]
+    proposals = pf.apply_filters(filters, [prop])
+
     return {"status": "success"}
 
 
@@ -41,37 +51,35 @@ def cron_entry(event=None, context=None):
     ending_proposals = snapshot.get_ending_proposals()
     filters = [
         pf.has_blocked_words,
-        pf.is_allowed_space,
-        pf.is_popular_space,
-        pf.is_contested_proposal,
+        pf.is_blocked_space,
+        pf.is_low_follower_space,
+        pf.is_not_contested_proposal,
         pf.has_recently_tweeted_space,
         pf.has_already_tweeted_prop,
     ]
 
     filtered_proposals = pf.apply_filters(filters, ending_proposals)
     for prop in filtered_proposals:
-        if not firestore.has_contested_tweet(prop["id"]):
+        if not firestore.has_contested_tweet(prop.id):
             status = govTweeter.contested_proposal_status(prop)
             govTweeter.update_twitter_status(status)
-            firestore.store_contested_proposal_tweet(prop["id"])
+            firestore.store_contested_proposal_tweet(prop.id)
 
 
 def dev_get_new():
     govTweeter = GovTweeter()
     new_proposals = snapshot.get_latest_proposals()
     filters = [
-        pf.is_new_proposal,
+        pf.is_old_proposal,
         pf.has_blocked_words,
-        pf.is_allowed_space,
-        pf.is_popular_space,
+        pf.is_blocked_space,
+        pf.is_low_follower_space,
         pf.has_recently_tweeted_space,
         pf.has_already_tweeted_prop,
     ]
     proposals = pf.apply_filters(filters, new_proposals)
 
     for prop in proposals:
-        print(prop)
-
         status = govTweeter.new_proposal_status(prop)
         govTweeter.update_twitter_status(status)
 

@@ -4,37 +4,40 @@ from datetime import datetime, timedelta
 from pkg_resources import resource_filename
 
 from govbot import snapshot, firestore, twitter
+from snapshot_schema import snapshot_schema as ss
 
 
 def apply_filters(filters: typing.List[typing.Callable], proposals):
     """Filter a list of proposals using the provided filters
 
-    Note: Low cost  nd/or highly restrictive filters should be put earlier in the list
+    Note: Filter using low cost and highly restrictive filters first for best performance
     """
     for fil in filters:
-        proposals = filter(fil, proposals)
+        # Invert the filter to exclude proposals that did not meet the filter criteria
+        proposals = filter(lambda p: not fil(p), proposals)
     return proposals
 
 
-def has_recently_tweeted_space(proposal: dict) -> bool:
+def has_recently_tweeted_space(proposal: ss.Proposal) -> bool:
+    """Check if a tweet about a proposal from this space has been sent in the last day"""
     space_name = twitter.get_space_name(proposal)
 
     govTweeter = twitter.GovTweeter()
-    return not govTweeter.has_recently_tweeted(space_name, timedelta(days=1))
+    return govTweeter.has_recently_tweeted(space_name, timedelta(days=1))
 
 
-def has_already_tweeted_prop(proposal: dict) -> bool:
+def has_already_tweeted_prop(proposal: ss.Proposal) -> bool:
+    # TODO: Store tweets in Firestore, query from that
     govTweeter = twitter.GovTweeter()
-    return not govTweeter.has_recently_tweeted(proposal["title"], timedelta(days=10))
+    return govTweeter.has_recently_tweeted(proposal.title, timedelta(days=10))
 
 
-def is_new_proposal(proposal):
+def is_old_proposal(proposal):
     """Where old == created more than 15 minutes ago"""
-    if (datetime.now() - datetime.fromtimestamp(proposal["created"])).seconds < 9000:
-        return True
+    return (datetime.now() - datetime.fromtimestamp(proposal.created)).seconds > 9000
 
 
-def is_contested_proposal(proposal: dict) -> bool:
+def is_not_contested_proposal(proposal: ss.Proposal) -> bool:
     """Returns whether the provided proposal is contested
 
     A proposal is considered contested when it is close to being tied
@@ -54,49 +57,45 @@ def is_contested_proposal(proposal: dict) -> bool:
     # Arbitrarily grab a result percentage and check how close to the percentage that would be a
     # tie (for the number of choices this proposal has. eg 0.5 for 2 choices, 0.3 for 3 etc)
     # If the resulting percentage is within 20% of a tie it is considered contested
-    if abs(list(result_percentages.values())[0] - tied_percentage) < 0.2 * tied_percentage:
-        return True
-
-    return False
+    return not abs(list(result_percentages.values())[0] - tied_percentage) < 0.2 * tied_percentage
 
 
-def is_high_activity_proposal(proposal: dict) -> bool:
-    """More voters than usual
+def is_low_activity_proposal(proposal: ss.Proposal) -> bool:
+    """Fewer voters than an interesting proposal might have
+
+    Obviously not useful for new proposals
 
     This considers whether the proposal has:
-        - more than an arbitrary threshold of voters (currently 10)
+        - more than 10 voters
         - more than 30% above avg activity for proposals in the space
     """
-    num_votes = len(snapshot.get_votes(proposal["id"]))
+    num_votes = len(snapshot.get_votes(proposal.id))
     if num_votes < 10:
         return False
 
-    avg_voters = firestore.get_avg_space_voters(proposal["space"]["id"])
-    if num_votes < avg_voters * 1.3:
-        return False
-
-    return True
+    avg_voters = firestore.get_avg_space_voters(proposal.space.id)
+    return num_votes < avg_voters * 1.3
 
 
-def is_allowed_space(proposal):
-    """The list of allowed spaces is all spaces with more than 3 proposals + >10 avg voters"""
+def is_blocked_space(proposal: ss.Proposal) -> bool:
+    """Any space that isn't in the allowed_spaces json is considered blocked
+
+    The list of allowed spaces is all spaces with more than 3 proposals + >10 avg voters
+    """
     with open(resource_filename("govbot", "allowed_spaces.json"), "r") as fi:
         spaces = json.load(fi)
 
-    if proposal["space"]["id"] in spaces:
+    return proposal.space.id not in spaces
+
+
+def is_low_follower_space(proposal: ss.Proposal) -> bool:
+    return len(snapshot.get_space_follows(proposal.space.id)) < 100
+
+
+def has_blocked_words(proposal: ss.Proposal) -> bool:
+    """A crude attempt to avoid tweeting about dev/spam proposals"""
+    if "TEST" in proposal.title.upper():
+        print("Ignoring proposal with test in title:", proposal.title)
         return True
 
-
-def is_popular_space(proposal):
-    """Check if thet proposal's space has more than 100 followers"""
-    if len(snapshot.get_space_followers(proposal["space"]["id"])) > 10:
-        return True
-
-
-def has_blocked_words(proposal):
-    """A crude attempt to avoid tweeting about test proposals"""
-    if "TEST" in proposal["title"].upper():
-        print("Ignoring proposal with test in title", proposal["title"])
-        return False
-
-    return True
+    return False
