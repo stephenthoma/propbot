@@ -2,25 +2,26 @@ import json
 import typing
 from datetime import datetime, timedelta
 from pkg_resources import resource_filename
+from itertools import filterfalse
 
 from govbot import snapshot, firestore, twitter
 from govbot.snapshot_schema import snapshot_schema as ss
 
 
-def apply_filters(filters: typing.List[typing.Callable], proposals):
+def apply_filters(filters: typing.List[typing.Callable], proposals: typing.List[ss.Proposal]):
     """Filter a list of proposals using the provided filters
 
     Note: Filter using low cost and highly restrictive filters first for best performance
     """
     for fil in filters:
-        # Invert the filter to exclude proposals that did not meet the filter criteria
-        proposals = filter(lambda p: not fil(p), proposals)
+        # If the filter returns false for the proposal, the proposal will be included
+        proposals = filterfalse(fil, proposals)  # type: ignore
     return proposals
 
 
 def has_recently_tweeted_space(proposal: ss.Proposal) -> bool:
     """Check if a tweet about a proposal from this space has been sent in the last day"""
-    space_name = twitter.get_space_name(proposal)
+    space_name = twitter._get_space_name(proposal)
 
     govTweeter = twitter.GovTweeter()
     return govTweeter.has_recently_tweeted(space_name, timedelta(days=1))
@@ -44,20 +45,20 @@ def is_not_contested_proposal(proposal: ss.Proposal) -> bool:
     """
     results = snapshot.get_proposal_results(proposal)
     if results is None:
-        return False
-
-    tied_percentage = 1 / len(results)
+        return True
 
     vote_sum = sum(results.values())
     if vote_sum == 0.0:
+        return True
+
+    if len(results) == 1:
+        # Edge case where all of the proposal choices are the same string
+        return True
+
+    result_percentages = sorted([votes / vote_sum for votes in results.values()])
+    if result_percentages[-1] - result_percentages[-2] < 0.1:
         return False
-
-    result_percentages = {choice: votes / vote_sum for choice, votes in results.items()}
-
-    # Arbitrarily grab a result percentage and check how close to the percentage that would be a
-    # tie (for the number of choices this proposal has. eg 0.5 for 2 choices, 0.3 for 3 etc)
-    # If the resulting percentage is within 20% of a tie it is considered contested
-    return not abs(list(result_percentages.values())[0] - tied_percentage) < 0.2 * tied_percentage
+    return True
 
 
 def is_low_activity_proposal(proposal: ss.Proposal) -> bool:
@@ -67,20 +68,20 @@ def is_low_activity_proposal(proposal: ss.Proposal) -> bool:
 
     This considers whether the proposal has:
         - more than 10 voters
-        - more than 30% above avg activity for proposals in the space
+        - more than X% above avg activity for proposals in the space
     """
     num_votes = len(snapshot.get_votes(proposal.id))
     if num_votes < 10:
-        return False
+        return True
 
     avg_voters = firestore.get_avg_space_voters(proposal.space.id)
-    return num_votes < avg_voters * 1.3
+    return num_votes < avg_voters * 1.5
 
 
 def is_blocked_space(proposal: ss.Proposal) -> bool:
     """Any space that isn't in the allowed_spaces json is considered blocked
 
-    The list of allowed spaces is all spaces with more than 3 proposals + >10 avg voters
+    The list of allowed spaces is all spaces with more than 3 proposals and >10 avg voters
     """
     with open(resource_filename("govbot", "allowed_spaces.json"), "r") as fi:
         spaces = json.load(fi)
@@ -94,8 +95,4 @@ def is_low_follower_space(proposal: ss.Proposal) -> bool:
 
 def has_blocked_words(proposal: ss.Proposal) -> bool:
     """A crude attempt to avoid tweeting about dev/spam proposals"""
-    if "TEST" in proposal.title.upper():
-        print("Ignoring proposal with test in title:", proposal.title)
-        return True
-
-    return False
+    return True if "TEST" in proposal.title.upper() else False
