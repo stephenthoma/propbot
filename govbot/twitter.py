@@ -40,6 +40,14 @@ class GovTweeter:
 
         return f'⚔️ [contested] {name} proposal: "{proposal.title}"\n\nVoting ends soon {end_date_str}\n{url}'
 
+    def high_activity_proposal_status(self, proposal: ss.Proposal) -> str:
+        """Create a string for a tweet about a contested proposal"""
+        end_date_str = _get_human_time(proposal.end)
+        url = snapshot.get_proposal_url(proposal.space.id, proposal.id)
+        name = _get_space_name(proposal)
+
+        return f'🔥 [high activity] {name} proposal: "{proposal.title}"\n\nVoting ends {end_date_str}\n{url}'
+
     def weekly_summary_status(self) -> str:
         stats = snapshot.get_week_summary()
 
