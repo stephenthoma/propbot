@@ -19,6 +19,7 @@ PROPOSAL_FIELDS = [
     "created",
     "end",
     "snapshot",
+    "strategies",
     "network",
     "state",
     "author",
@@ -31,19 +32,20 @@ PROPOSAL_SPACE_FIELDS = [
 ]
 
 
-def get_proposal_results(proposal: dict) -> typing.Optional[typing.Dict[str, float]]:
+def get_proposal_results(proposal: ss.Proposal) -> typing.Optional[typing.Dict[str, float]]:
     """Calculate the results of a proposal by retrieving all votes, then requesting scores
 
     Returns:
         dict: The keys are the proposal choices, values are the sum of votes for each choice
     """
-    votes = get_votes(proposal["id"])
-    voter_addresses = [v["voter"] for v in votes]
+    votes = get_votes(proposal.id)
+    voter_addresses = [v.voter for v in votes]
+    strategies = [s.__to_json_value__() for s in proposal.strategies]
     scores = get_scores(
-        proposal["space"]["id"],
-        proposal["strategies"],
-        proposal["network"],
-        int(proposal["snapshot"]),
+        proposal.space.id,
+        strategies,
+        proposal.network,
+        int(proposal.snapshot),
         voter_addresses,
     )
 
@@ -51,14 +53,14 @@ def get_proposal_results(proposal: dict) -> typing.Optional[typing.Dict[str, flo
         return None
 
     # Votes have a choice int that is 1-indexed map to the choices list from the proposal
-    choice_map = {i + 1: choice for i, choice in enumerate(proposal["choices"])}
+    choice_map = {i + 1: choice for i, choice in enumerate(proposal.choices)}
 
-    results = {choice: 0.0 for choice in proposal["choices"]}
+    results = {choice: 0.0 for choice in proposal.choices}
     try:
         for vote in votes:
-            choice = choice_map[vote["choice"]]
+            choice = choice_map[vote.choice]
             # Not sure why scores is an array here?
-            results[choice] += scores[0][vote["voter"]]
+            results[choice] += scores[0][vote.voter]
     except:
         return None
 
@@ -86,7 +88,7 @@ def get_scores(space_id: str, strategies: list, network: str, snapshot: int, add
 
 def get_votes(proposal_id: str) -> list[ss.Vote]:
     op = Operation(ss.Query)
-    op_votes = op.votes(where={"proposal": proposal_id}, first=10000)
+    op_votes = op.votes(where={"proposal": proposal_id}, first=10e5)
     op_votes.__fields__("choice", "voter")
     return run_operation(op).votes
 
@@ -106,6 +108,7 @@ def get_proposal(proposal_id: str) -> ss.Proposal:
     op_proposal = op.proposal(id=proposal_id)
     op_proposal.__fields__(*PROPOSAL_FIELDS)
     op_proposal.space().__fields__(*PROPOSAL_SPACE_FIELDS)
+    op_proposal.strategies().__fields__("name", "params")
     return run_operation(op).proposal
 
 
@@ -121,17 +124,15 @@ def get_latest_proposals() -> list[ss.Proposal]:
 
 def get_space_follows(space_id: str) -> list[ss.Follow]:
     op = Operation(ss.Query, name="getSpaceFollows")
-    op_follows = op.follows(where={"space": space_id})
+    op_follows = op.follows(where={"space": space_id}, first=10e5)
     op_follows.follower()
-    return run_operation(op)
+    return run_operation(op).follows
 
 
 def get_week_summary() -> dict:
     """Get a summary of activity on the snapshot platform from the last week"""
     a_week_ago = int((datetime.datetime.now() - datetime.timedelta(days=7)).timestamp())
     op = Operation(ss.Query)
-    op_votes = op.votes(where={"created_gte": a_week_ago}, first=10e5)
-    op_votes.id()
 
     op_proposals = op.proposals(where={"created_gte": a_week_ago}, first=10e5)
     op_proposals.id()
@@ -144,10 +145,36 @@ def get_week_summary() -> dict:
 
     counts = Counter([f.space.name for f in res.follows])
     return {
-        "num_votes": len(res.votes),
+        "num_votes": get_count_weeks_votes(),
         "num_proposals": len(res.proposals),
         "top_growth_spaces": counts.most_common(3),
     }
+
+
+def get_count_weeks_votes() -> int:
+    """The API caps results at 100,000. So split into multiple queries and sum"""
+
+    def get_votes_from_timespan(start, end):
+        start_stamp = int(start.timestamp())
+        end_stamp = int(end.timestamp())
+        op = Operation(ss.Query)
+        op_vote = op.votes(where={"created_gte": start_stamp, "created_lte": end_stamp}, first=10e4)
+        op_vote.id()
+        res = run_operation(op)
+        return res.votes
+
+    vote_sum = 0
+    end_time = datetime.datetime.now()
+    for day_offset in range(1, 8):
+        start_time = end_time - datetime.timedelta(days=day_offset)
+        days_votes = len(get_votes_from_timespan(start_time, end_time))
+        if days_votes == 10e4:
+            print("Warning: Vote retrieval likely hit API limit")
+
+        vote_sum += days_votes
+        end_time = start_time
+
+    return vote_sum
 
 
 def get_proposal_url(space_id: str, proposal_id: str) -> str:
