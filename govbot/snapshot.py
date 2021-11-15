@@ -7,7 +7,7 @@ from collections import defaultdict, Counter
 import requests
 from sgqlc.operation import Operation
 
-from snapshot_schema import snapshot_schema as ss
+from govbot.snapshot_schema import snapshot_schema as ss
 
 SNAPSHOT_GRAPH_URL = "https://hub.snapshot.org/graphql"
 SNAPSHOT_SCORE_API = "https://score.snapshot.org/api/scores"

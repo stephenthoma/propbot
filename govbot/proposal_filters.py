@@ -4,7 +4,7 @@ from datetime import datetime, timedelta
 from pkg_resources import resource_filename
 
 from govbot import snapshot, firestore, twitter
-from snapshot_schema import snapshot_schema as ss
+from govbot.snapshot_schema import snapshot_schema as ss
 
 
 def apply_filters(filters: typing.List[typing.Callable], proposals):
