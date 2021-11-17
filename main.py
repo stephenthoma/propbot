@@ -1,6 +1,6 @@
 """
 IDEAS:
-    - high activity proposal alert tweet. when # voters is X std deviations above average
+    - monthly summary
     - consider adding cashtags to tweets?
     - make a mapping of space name to project twitter @
     - make a mapping of string to project twitter @ -- eg "Convex Finance" gets replaced with @convexfinance
@@ -21,21 +21,23 @@ from govbot.twitter import GovTweeter
 
 def webhook_entry(req):
     """Entrypoint for the webhook based cloud function"""
-    prop_id = req.json["id"].split("proposal/")[1]
-    prop = snapshot.get_proposal(prop_id)
-    if is_valid_proposal(prop):
-        gov_tweeter = GovTweeter()
-        gov_tweeter.tweet_proposal(prop)
+    proposal_id = req.json["id"].split("proposal/")[1]
+    proposal = snapshot.get_proposal(proposal_id)
+    gov_tweeter = GovTweeter()
 
     filters = [
-        pf.is_old_proposal,
         pf.has_blocked_words,
         pf.is_blocked_space,
         pf.is_low_follower_space,
         pf.has_recently_tweeted_space,
         pf.has_already_tweeted_prop,
     ]
-    proposals = pf.apply_filters(filters, [prop])
+
+    for fil in filters:
+        if fil(proposal) == True:
+            break
+    else:
+        gov_tweeter.update_twitter_status(gov_tweeter.new_proposal_status(proposal))
 
     return {"status": "success"}
 
@@ -92,27 +94,19 @@ def high_activity_cron():
         gov_tweeter.update_twitter_status(status)
 
 
-def dev_get_new():
-    gov_tweeter = GovTweeter()
-    new_proposals = snapshot.get_latest_proposals()
-    filters = [
-        # pf.is_old_proposal,
-        pf.has_blocked_words,
-        pf.is_blocked_space,
-        pf.is_low_follower_space,
-        pf.has_recently_tweeted_space,
-        pf.has_already_tweeted_prop,
-    ]
-    proposals = pf.apply_filters(filters, new_proposals)
+def _dev_get_new():
+    from collections import namedtuple
 
-    for prop in proposals:
-        status = gov_tweeter.new_proposal_status(prop)
-        gov_tweeter.update_twitter_status(status)
+    Req = namedtuple("request", "json")
+
+    new_proposals = snapshot.get_latest_proposals()
+    for proposal in new_proposals:
+        req = Req(json={"id": f"proposal/{proposal.id}"})
+        webhook_entry(req)
 
 
 if __name__ == "__main__":
     # cron_entry()
-    # dev_get_new()
-    high_activity_cron()
-    # gov_tweeter = GovTweeter()
+    _dev_get_new()
+    # high_activity_cron()
     # print(snapshot.get_week_summary())
