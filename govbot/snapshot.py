@@ -28,6 +28,7 @@ PROPOSAL_FIELDS = [
 PROPOSAL_SPACE_FIELDS = [
     "id",
     "name",
+    "members",
     "twitter",
 ]
 
@@ -177,9 +178,9 @@ def get_count_weeks_votes() -> int:
     return vote_sum
 
 
-def get_proposal_url(space_id: str, proposal_id: str) -> str:
+def get_proposal_url(proposal: ss.Proposal) -> str:
     """Get the URL of the proposal on the Snapshot website"""
-    return f"https://snapshot.org/#/{space_id}/proposal/{proposal_id}"
+    return f"https://snapshot.org/#/{proposal.space.id}/proposal/{proposal.id}"
 
 
 def run_operation(op, variables: dict = None):

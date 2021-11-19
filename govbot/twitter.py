@@ -27,7 +27,7 @@ class GovTweeter:
     def new_proposal_status(self, proposal: ss.Proposal) -> str:
         """Create a string for a tweet about a new proposal"""
         end_date_str = _get_human_time(proposal.end)
-        url = snapshot.get_proposal_url(proposal.space.id, proposal.id)
+        url = snapshot.get_proposal_url(proposal)
         name = _get_space_name(proposal)
 
         return f'⚡️ {name} proposal: "{proposal.title}"\n\nVoting ends {end_date_str}\n{url}'
@@ -35,7 +35,7 @@ class GovTweeter:
     def contested_proposal_status(self, proposal: ss.Proposal) -> str:
         """Create a string for a tweet about a contested proposal"""
         end_date_str = _get_human_time(proposal.end)
-        url = snapshot.get_proposal_url(proposal.space.id, proposal.id)
+        url = snapshot.get_proposal_url(proposal)
         name = _get_space_name(proposal)
 
         return f'⚔️ [contested] {name} proposal: "{proposal.title}"\n\nVoting ends soon {end_date_str}\n{url}'
@@ -43,7 +43,7 @@ class GovTweeter:
     def high_activity_proposal_status(self, proposal: ss.Proposal) -> str:
         """Create a string for a tweet about a contested proposal"""
         end_date_str = _get_human_time(proposal.end)
-        url = snapshot.get_proposal_url(proposal.space.id, proposal.id)
+        url = snapshot.get_proposal_url(proposal)
         name = _get_space_name(proposal)
 
         return f'🔥 [high activity] {name} proposal: "{proposal.title}"\n\nVoting ends {end_date_str}\n{url}'

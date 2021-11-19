@@ -1,9 +1,9 @@
 """
 IDEAS:
     - monthly summary
+    - add sum of new spaces to summary
+    - tweet about proposals that have lots of discussion on twitter
     - consider adding cashtags to tweets?
-    - make a mapping of space name to project twitter @
-    - make a mapping of string to project twitter @ -- eg "Convex Finance" gets replaced with @convexfinance
 PROBLEMS:
     - has_already_tweeted_prop filter will prevent high activity / contested tweets for props that
       were tweeted about at creation time
@@ -27,8 +27,8 @@ def webhook_entry(req):
 
     filters = [
         pf.has_blocked_words,
+        pf.is_non_member_author,
         pf.is_blocked_space,
-        pf.is_low_follower_space,
         pf.has_recently_tweeted_space,
         pf.has_already_tweeted_prop,
     ]
@@ -37,7 +37,9 @@ def webhook_entry(req):
         if fil(proposal) == True:
             break
     else:
-        gov_tweeter.update_twitter_status(gov_tweeter.new_proposal_status(proposal))
+        # Only tweet new proposals from top spaces (for now) to avoid spam
+        if len(snapshot.get_space_follows(proposal.space.id)) > 1000:
+            gov_tweeter.update_twitter_status(gov_tweeter.new_proposal_status(proposal))
 
     return {"status": "success"}
 
@@ -106,7 +108,7 @@ def _dev_get_new():
 
 
 if __name__ == "__main__":
-    # cron_entry()
     _dev_get_new()
+    # contested_cron()
     # high_activity_cron()
     # print(snapshot.get_week_summary())

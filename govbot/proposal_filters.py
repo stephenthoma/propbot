@@ -89,6 +89,10 @@ def is_blocked_space(proposal: ss.Proposal) -> bool:
     return proposal.space.id not in spaces
 
 
+def is_non_member_author(proposal: ss.Proposal) -> bool:
+    return proposal.author not in proposal.space.members
+
+
 def is_low_follower_space(proposal: ss.Proposal) -> bool:
     return len(snapshot.get_space_follows(proposal.space.id)) < 100
 
