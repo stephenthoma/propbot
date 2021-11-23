@@ -12,6 +12,9 @@ PROBLEMS:
 import json
 import base64
 from datetime import datetime
+from hashlib import sha256
+
+import flask
 
 from govbot import proposal_filters as pf
 from govbot import firestore
@@ -21,6 +24,9 @@ from govbot.twitter import GovTweeter
 
 def webhook_entry(req):
     """Entrypoint for the webhook based cloud function"""
+    if sha256(req.json.get("secret")) != os.environ["SNAPSHOT_SECRET"]:
+        return flask.Response(status=401)
+
     proposal_id = req.json["id"].split("proposal/")[1]
     proposal = snapshot.get_proposal(proposal_id)
     gov_tweeter = GovTweeter()
@@ -41,7 +47,7 @@ def webhook_entry(req):
         if len(snapshot.get_space_follows(proposal.space.id)) > 1000:
             gov_tweeter.update_twitter_status(gov_tweeter.new_proposal_status(proposal))
 
-    return {"status": "success"}
+    return flask.Response(status=200)
 
 
 def cron_entry(event=None, context=None):
