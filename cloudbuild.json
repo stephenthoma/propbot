@@ -12,8 +12,7 @@
         "--region=us-central1",
         "--runtime=python310",
         "--allow-unauthenticated",
-        "--entry-point=webhook_entry",
-        "--env-vars-file=./config/prod.yaml"
+        "--entry-point=webhook_entry"
       ]
     },
     {
@@ -27,8 +26,7 @@
         "--region=us-central1",
         "--runtime=python310",
         "--trigger-topic=gov-bot-cron",
-        "--entry-point=cron_entry",
-        "--env-vars-file=./config/prod.yaml"
+        "--entry-point=cron_entry"
       ]
     }
   ]
