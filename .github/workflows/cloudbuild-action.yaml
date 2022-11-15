@@ -54,4 +54,3 @@ jobs:
           gcloud builds submit \
             --quiet \
             --config="$GITHUB_WORKSPACE/cloudbuild.json"
-            --tag "gcr.io/$PROJECT_ID/$SERVICE_NAME:$GITHUB_SHA"
