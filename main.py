@@ -9,9 +9,8 @@ PROBLEMS:
       were tweeted about at creation time
 """
 
-import json
+import os
 import base64
-from datetime import datetime
 from hashlib import sha256
 
 import flask
@@ -24,7 +23,7 @@ from govbot.twitter import GovTweeter
 
 def webhook_entry(req):
     """Entrypoint for the webhook based cloud function"""
-    if sha256(req.json.get("secret")) != os.environ["SNAPSHOT_SECRET"]:
+    if sha256(req.json.get("secret").encode("utf-8")) != os.environ["SNAPSHOT_SECRET"]:
         return flask.Response(status=401)
 
     proposal_id = req.json["id"].split("proposal/")[1]
@@ -52,6 +51,9 @@ def webhook_entry(req):
 
 def cron_entry(event=None, context=None):
     """Entrypoint for the pub-sub based cloud function"""
+    if not event:
+        return
+
     message = base64.b64decode(event["data"])
 
     if message == b"check_special":
