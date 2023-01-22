@@ -1,5 +1,0 @@
-requests
-tweepy
-google-cloud-firestore
-sgqlc
-pytz
