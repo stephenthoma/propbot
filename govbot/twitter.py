@@ -6,11 +6,13 @@ import tweepy
 from tweepy.models import Status
 import pytz
 
-from govbot import snapshot, queue
+from govbot import snapshot
+from govbot import queue
 from govbot.snapshot_schema import snapshot_schema as ss
 
 
 def enqueue_status_update_tweets(in_reply_to_status_id: str, proposal: ss.Proposal):
+    handler_url = "https://us-central1-static-174201.cloudfunctions.net/reply-tweet-hook "
     payload = {
         "proposal_id": proposal.id,
         "func_name": "vote_update_status",
@@ -19,8 +21,8 @@ def enqueue_status_update_tweets(in_reply_to_status_id: str, proposal: ss.Propos
     proposal_half_complete_secs = int((proposal.end - proposal.start) / 2)
     proposal_complete_secs = int(proposal.end - proposal.start)
 
-    queue.enqueue_task("followup-tweet-queue", payload, proposal_half_complete_secs)
-    queue.enqueue_task("followup-tweet-queue", payload, proposal_complete_secs)
+    queue.enqueue_task("followup-tweet-queue", handler_url, payload, proposal_half_complete_secs)
+    queue.enqueue_task("followup-tweet-queue", handler_url, payload, proposal_complete_secs)
 
 
 class GovTweeter:
