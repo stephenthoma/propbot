@@ -9,5 +9,7 @@
 # gcloud scheduler jobs create pubsub gov-bot \
 #    --schedule="*/15 * * * *" --topic="gov-bot-cron" \
 #    --message-body="check_special"
+#
+# gcloud tasks queues create followup-tweet-queue --location=us-central1
 
 

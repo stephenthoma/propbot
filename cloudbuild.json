@@ -6,6 +6,21 @@
         "gcloud",
         "functions",
         "deploy",
+        "reply-tweet-hook",
+        "--source=.",
+        "--trigger-http",
+        "--region=us-central1",
+        "--runtime=python310",
+        "--allow-unauthenticated",
+        "--entry-point=reply_tweet_entry"
+      ]
+    },
+    {
+      "name": "gcr.io/google.com/cloudsdktool/cloud-sdk",
+      "args": [
+        "gcloud",
+        "functions",
+        "deploy",
         "gov-bot-hook",
         "--source=.",
         "--trigger-http",

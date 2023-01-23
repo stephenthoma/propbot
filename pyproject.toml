@@ -13,7 +13,11 @@ tweepy = "^4.12.1"
 google-cloud-firestore = "^2.9.0"
 sgqlc = "^16.1"
 pytz = "^2022.7.1"
+google-cloud-tasks = "^2.12.0"
 
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^7.2.1"
 
 [build-system]
 requires = ["poetry-core"]

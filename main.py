@@ -18,7 +18,26 @@ import flask
 from govbot import proposal_filters as pf
 from govbot import firestore
 from govbot import snapshot
-from govbot.twitter import GovTweeter
+from govbot.twitter import GovTweeter, enqueue_status_update_tweets
+
+
+def reply_tweet_entry(req):
+    if req.json.get("secret") != os.environ["APP_SECRET"]:
+        return flask.Response(status=401)
+
+    proposal_id = req.json["proposal_id"]
+    tweet_str_func_name = req.json["func_name"]
+    in_reply_to_status_id = req.json["in_reply_to_status_id"]
+
+    proposal = snapshot.get_proposal(proposal_id)
+
+    gov_tweeter = GovTweeter()
+    status = getattr(gov_tweeter, tweet_str_func_name)(proposal)
+    gov_tweeter.update_twitter_status(
+        status, in_reply_to_status_id, auto_populate_reply_metadata=True
+    )
+
+    return flask.Response(status=200)
 
 
 def webhook_entry(req):
@@ -44,7 +63,9 @@ def webhook_entry(req):
     else:
         # Only tweet new proposals from top spaces (for now) to avoid spam
         if len(snapshot.get_space_follows(proposal.space.id)) > 1000:
-            gov_tweeter.update_twitter_status(gov_tweeter.new_proposal_status(proposal))
+            status = gov_tweeter.update_twitter_status(gov_tweeter.new_proposal_status(proposal))
+            if status:
+                enqueue_status_update_tweets(status.id, proposal)
 
     return flask.Response(status=200)
 

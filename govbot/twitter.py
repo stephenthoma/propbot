@@ -1,12 +1,26 @@
 import os
 import datetime
-import typing
-import pytz
+from typing import Optional
 
 import tweepy
+from tweepy.models import Status
+import pytz
 
-from govbot import snapshot
+from govbot import snapshot, queue
 from govbot.snapshot_schema import snapshot_schema as ss
+
+
+def enqueue_status_update_tweets(in_reply_to_status_id: str, proposal: ss.Proposal):
+    payload = {
+        "proposal_id": proposal.id,
+        "func_name": "vote_update_status",
+        "in_reply_to_status_id": in_reply_to_status_id,
+    }
+    proposal_half_complete_secs = int((proposal.end - proposal.start) / 2)
+    proposal_complete_secs = int(proposal.end - proposal.start)
+
+    queue.enqueue_task("followup-tweet-queue", payload, proposal_half_complete_secs)
+    queue.enqueue_task("followup-tweet-queue", payload, proposal_complete_secs)
 
 
 class GovTweeter:
@@ -23,6 +37,12 @@ class GovTweeter:
         auth = tweepy.OAuthHandler(CONSUMER_KEY, CONSUMER_SECRET)
         auth.set_access_token(ACCESS_TOKEN, ACCESS_SECRET)
         return tweepy.API(auth)
+
+    def vote_update_status(self, proposal: ss.Proposal) -> str:
+        """Create a string for a reply tweet updating on the proposal's votes"""
+        results = snapshot.get_proposal_results(proposal)
+        # TODO: make it pretty
+        return str(results)
 
     def new_proposal_status(self, proposal: ss.Proposal) -> str:
         """Create a string for a tweet about a new proposal"""
@@ -60,11 +80,18 @@ class GovTweeter:
             f'- {stats["top_growth_spaces"][2][0]}: +{stats["top_growth_spaces"][2][1]:,} followers'
         )
 
-    def update_twitter_status(self, status: str):
+    def update_twitter_status(
+        self,
+        status: str,
+        in_reply_to_status_id: Optional[str] = None,
+        auto_populate_reply_metadata: Optional[bool] = False,
+    ) -> Optional[Status]:
         if self.is_production:
-            result = self.api.update_status(status)
-        else:
-            print(status)
+            return self.api.update_status(
+                status,
+                in_reply_to_status_id=in_reply_to_status_id,
+                auto_populate_reply_metadata=auto_populate_reply_metadata,
+            )
 
     def has_recently_tweeted(self, search_str: str, cutoff_delta: datetime.timedelta) -> bool:
         cutoff_time = pytz.utc.localize(datetime.datetime.now() - cutoff_delta)

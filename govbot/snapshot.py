@@ -1,12 +1,9 @@
 import datetime
-import typing
-import json
-from pkg_resources import resource_filename
-from collections import defaultdict, Counter
+from typing import Optional, List, Dict
+from collections import Counter
 
 import requests
 from sgqlc.operation import Operation
-
 from govbot.snapshot_schema import snapshot_schema as ss
 
 SNAPSHOT_GRAPH_URL = "https://hub.snapshot.org/graphql"
@@ -33,22 +30,14 @@ PROPOSAL_SPACE_FIELDS = [
 ]
 
 
-def get_proposal_results(proposal: ss.Proposal) -> typing.Optional[typing.Dict[str, float]]:
+def get_proposal_results(proposal: ss.Proposal) -> Optional[Dict[str, float]]:
     """Calculate the results of a proposal by retrieving all votes, then requesting scores
 
     Returns:
         dict: The keys are the proposal choices, values are the sum of votes for each choice
     """
     votes = get_votes(proposal.id)
-    voter_addresses = [v.voter for v in votes]
-    strategies = [s.__to_json_value__() for s in proposal.strategies]
-    scores = get_scores(
-        proposal.space.id,
-        strategies,
-        proposal.network,
-        int(proposal.snapshot),
-        voter_addresses,
-    )
+    scores = get_scores(proposal, [v.voter for v in votes])
 
     if scores is None:
         return None
@@ -68,13 +57,13 @@ def get_proposal_results(proposal: ss.Proposal) -> typing.Optional[typing.Dict[s
     return results
 
 
-def get_scores(space_id: str, strategies: list, network: str, snapshot: int, addresses: list):
+def get_scores(proposal: ss.Proposal, addresses: List[str]):
     """Retrieve the vote balance for a list of voter addresses"""
     params = {
-        "space": space_id,
-        "network": network,
-        "snapshot": snapshot,
-        "strategies": strategies,
+        "space": proposal.space.id,
+        "network": proposal.network,
+        "snapshot": int(proposal.snapshot),
+        "strategies": [s.__to_json_value__() for s in proposal.strategies],
         "addresses": addresses,
     }
 
@@ -96,8 +85,13 @@ def get_votes(proposal_id: str) -> list[ss.Vote]:
 
 def get_ending_proposals() -> list[ss.Proposal]:
     op = Operation(ss.Query, name="getEndingProposals")
+    day_after_tomorrow = int((datetime.datetime.now() + datetime.timedelta(days=2)).timestamp())
+
     op_proposals = op.proposals(
-        first=50, where={"state": "active"}, order_by="end", order_direction="asc"
+        first=100,
+        where={"state": "active", "end_lte": day_after_tomorrow},
+        order_by="end",
+        order_direction="asc",
     )
     op_proposals.__fields__(*PROPOSAL_FIELDS)
     op_proposals.space().__fields__(*PROPOSAL_SPACE_FIELDS)
@@ -130,12 +124,32 @@ def get_space_follows(space_id: str) -> list[ss.Follow]:
     return run_operation(op).follows
 
 
+def get_spaces():
+    """API limits each request to 100 spaces"""
+
+    def get_space_page(skip: int):
+        op = Operation(ss.Query, name="getSpaces")
+        op_space = op.spaces(first=100, skip=skip)
+        op_space.id()
+        return run_operation(op).spaces
+
+    skip = 0
+    page = get_space_page(skip)
+    spaces = [*page]
+    while len(page) > 0:
+        skip += 100
+        page = get_space_page(skip)
+        spaces.extend(page)
+
+    return spaces
+
+
 def get_week_summary() -> dict:
     """Get a summary of activity on the snapshot platform from the last week"""
     a_week_ago = int((datetime.datetime.now() - datetime.timedelta(days=7)).timestamp())
     op = Operation(ss.Query)
 
-    op_proposals = op.proposals(where={"created_gte": a_week_ago}, first=10e5)
+    op_proposals: typing.Any = op.proposals(where={"created_gte": a_week_ago}, first=10e5)
     op_proposals.id()
 
     op_follows = op.follows(where={"created_gte": a_week_ago}, first=10e5)
@@ -183,11 +197,13 @@ def get_proposal_url(proposal: ss.Proposal) -> str:
     return f"https://snapshot.org/#/{proposal.space.id}/proposal/{proposal.id}"
 
 
-def run_operation(op, variables: dict = None):
+def run_operation(op, variables: Optional[dict] = None):
     return op + run_query(str(op), SNAPSHOT_GRAPH_URL, variables)
 
 
-def run_query(query: str, url: str, headers: dict = None, variables: dict = None) -> dict:
+def run_query(
+    query: str, url: str, headers: Optional[dict] = None, variables: Optional[dict] = None
+) -> dict:
     """Sends a GraphQL query"""
     res = requests.post(url, json={"query": query, "variables": variables}, headers=headers)
 
