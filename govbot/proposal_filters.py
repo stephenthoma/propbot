@@ -70,7 +70,7 @@ def is_low_activity_proposal(proposal: ss.Proposal) -> bool:
         - more than 10 voters
         - more than X% above avg activity for proposals in the space
     """
-    num_votes = len(snapshot.get_votes(proposal.id))
+    num_votes = proposal.votes
     if num_votes < 10:
         return True
 
@@ -94,7 +94,7 @@ def is_non_member_author(proposal: ss.Proposal) -> bool:
 
 
 def is_low_follower_space(proposal: ss.Proposal) -> bool:
-    return len(snapshot.get_space_follows(proposal.space.id)) < 100
+    return len(proposal.space.followerCount) < 100
 
 
 def has_blocked_words(proposal: ss.Proposal) -> bool:

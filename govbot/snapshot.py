@@ -1,32 +1,38 @@
 import json
 import datetime
-from typing import Callable, Optional, List, Dict
+from typing import Callable, Optional, Dict
 from collections import Counter
 
 import requests
+from requests.adapters import HTTPAdapter
+from requests.packages.urllib3.util.retry import Retry
 from sgqlc.operation import Operation
 from govbot.snapshot_schema import snapshot_schema as ss
+from govbot import log
 
 SNAPSHOT_GRAPH_URL = "https://hub.snapshot.org/graphql"
 SNAPSHOT_SCORE_API = "https://score.snapshot.org/api/scores"
 
 PROPOSAL_FIELDS = [
-    "id",
-    "title",
-    "start",
-    "created",
-    "end",
-    "snapshot",
-    "strategies",
-    "network",
-    "state",
     "author",
     "choices",
+    "created",
+    "end",
+    "id",
+    "network",
+    "scores",
+    "scores_total" "snapshot",
+    "start",
+    "state",
+    "strategies",
+    "title",
+    "votes",
 ]
 PROPOSAL_SPACE_FIELDS = [
+    "followersCount",
     "id",
-    "name",
     "members",
+    "name",
     "twitter",
 ]
 
@@ -37,53 +43,11 @@ def get_proposal_results(proposal: ss.Proposal) -> Optional[Dict[str, float]]:
     Returns:
         dict: The keys are the proposal choices, values are the sum of votes for each choice
     """
-    votes = get_votes(proposal.id)
-    if votes is None:
+    if proposal.votes == 0:
         return None
 
-    scores = get_scores(proposal, [v.voter for v in votes])
-    if scores is None:
-        return None
-
-    # Votes have a choice int that is 1-indexed map to the choices list from the proposal
-    choice_map = {i + 1: choice for i, choice in enumerate(proposal.choices)}
-
-    results = {choice: 0.0 for choice in proposal.choices}
-    try:
-        for vote in votes:
-            choice = choice_map[vote.choice]
-            # Not sure why scores is an array here?
-            results[choice] += scores[0][vote.voter]
-    except:
-        return None
-
+    results = dict(zip(proposal.choices, proposal.scores))
     return results
-
-
-def get_scores(proposal: ss.Proposal, addresses: List[str]):
-    """Retrieve the vote balance for a list of voter addresses"""
-    params = {
-        "space": proposal.space.id,
-        "network": proposal.network,
-        "snapshot": int(proposal.snapshot),
-        "strategies": [s.__to_json_value__() for s in proposal.strategies],
-        "addresses": addresses,
-    }
-
-    res_json = requests.post(SNAPSHOT_SCORE_API, json={"params": params}).json()
-
-    if "error" in res_json:
-        print("Error:", json.dumps(res_json["error"]))
-        return None
-    else:
-        return res_json["result"]["scores"]
-
-
-def get_votes(proposal_id: str) -> list[ss.Vote]:
-    op = Operation(ss.Query)
-    op_votes = op.votes(where={"proposal": proposal_id})
-    op_votes.__fields__("choice", "voter")
-    return run_operation(op).votes
 
 
 def get_ending_proposals() -> list[ss.Proposal]:
@@ -97,7 +61,7 @@ def get_ending_proposals() -> list[ss.Proposal]:
         order_direction="asc",
     )
     op_proposals.__fields__(*PROPOSAL_FIELDS)
-    op_proposals.space().__fields__(*PROPOSAL_SPACE_FIELDS)
+    op_proposals.space.__fields__(*PROPOSAL_SPACE_FIELDS)
     return run_operation(op).proposals
 
 
@@ -120,35 +84,21 @@ def get_latest_proposals() -> list[ss.Proposal]:
     return run_operation(op).proposals
 
 
-def get_paginated(fetch_func: Callable, page_size: int) -> list:
-    skip = 0
-    results = []
-    while True:
-        page = fetch_func(page_size, skip)
-        if not page or len(page) == 0:
-            break
+def get_votes(proposal_id: str) -> list[ss.Vote]:
+    def get_votes_page(page_size: int, skip: int):
+        op = Operation(ss.Query)
+        op_votes = op.votes(first=page_size, skip=skip, where={"proposal": proposal_id})
+        op_votes.__fields__("choice", "voter")
+        return run_operation(op).votes
 
-        skip += page_size
-        results.extend(page)
-
-    return results
-
-
-def get_space_follows(space_id: str) -> list[ss.Follow]:
-    def get_follows_page(page_size: int, skip: int):
-        op = Operation(ss.Query, name="getSpaceFollows")
-        op_follows = op.follows(first=page_size, skip=skip, where={"space": space_id})
-        op_follows.follower()
-        return run_operation(op).follows
-
-    return get_paginated(get_follows_page, 1000)
+    return get_paginated(get_votes_page, 1000)
 
 
 def get_spaces():
     def get_space_page(page_size: int, skip: int):
         op = Operation(ss.Query, name="getSpaces")
         op_space = op.spaces(first=page_size, skip=skip)
-        op_space.id()
+        op_space.__fields__("id")
         return run_operation(op).spaces
 
     return get_paginated(get_space_page, 100)
@@ -207,6 +157,20 @@ def get_proposal_url(proposal: ss.Proposal) -> str:
     return f"https://snapshot.org/#/{proposal.space.id}/proposal/{proposal.id}"
 
 
+def get_paginated(fetch_func: Callable, page_size: int) -> list:
+    skip = 0
+    results = []
+    while True:
+        page = fetch_func(page_size, skip)
+        if not page or len(page) == 0:
+            break
+
+        skip += page_size
+        results.extend(page)
+
+    return results
+
+
 def run_operation(op, variables: Optional[dict] = None):
     return op + run_query(str(op), SNAPSHOT_GRAPH_URL, variables)
 
@@ -214,13 +178,27 @@ def run_operation(op, variables: Optional[dict] = None):
 def run_query(
     query: str, url: str, headers: Optional[dict] = None, variables: Optional[dict] = None
 ) -> dict:
-    """Sends a GraphQL query"""
-    res = requests.post(url, json={"query": query, "variables": variables}, headers=headers)
+
+    retry_strategy = Retry(
+        total=3,
+        backoff_factor=2,
+        status_forcelist=[429, 500, 502, 503, 504],
+        method_whitelist=["OPTIONS", "POST"],
+    )
+    adapter = HTTPAdapter(max_retries=retry_strategy)
+    session = requests.Session()
+    session.mount("https://", adapter)
+
+    res = session.post(url, json={"query": query, "variables": variables}, headers=headers)
 
     try:
         res.raise_for_status()
     except requests.HTTPError as err:
-        print("Error: Got bad status code in GraphQL query response:", res.text)
+        log.send_msg(
+            severity="ERROR",
+            message="Got bad status code in GraphQL query response",
+            error_message=res.text,
+        )
         raise err
 
     return res.json()
