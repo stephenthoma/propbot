@@ -1,3 +1,4 @@
+import json
 import datetime
 from typing import Optional, List, Dict
 from collections import Counter
@@ -37,8 +38,10 @@ def get_proposal_results(proposal: ss.Proposal) -> Optional[Dict[str, float]]:
         dict: The keys are the proposal choices, values are the sum of votes for each choice
     """
     votes = get_votes(proposal.id)
-    scores = get_scores(proposal, [v.voter for v in votes])
+    if votes is None:
+        return None
 
+    scores = get_scores(proposal, [v.voter for v in votes])
     if scores is None:
         return None
 
@@ -70,7 +73,7 @@ def get_scores(proposal: ss.Proposal, addresses: List[str]):
     res_json = requests.post(SNAPSHOT_SCORE_API, json={"params": params}).json()
 
     if "error" in res_json:
-        print("Error:", res_json["error"]["data"]["reason"])
+        print("Error:", json.dumps(res_json["error"]))
         return None
     else:
         return res_json["result"]["scores"]
@@ -78,7 +81,7 @@ def get_scores(proposal: ss.Proposal, addresses: List[str]):
 
 def get_votes(proposal_id: str) -> list[ss.Vote]:
     op = Operation(ss.Query)
-    op_votes = op.votes(where={"proposal": proposal_id}, first=10e5)
+    op_votes = op.votes(where={"proposal": proposal_id})
     op_votes.__fields__("choice", "voter")
     return run_operation(op).votes
 
@@ -118,10 +121,21 @@ def get_latest_proposals() -> list[ss.Proposal]:
 
 
 def get_space_follows(space_id: str) -> list[ss.Follow]:
-    op = Operation(ss.Query, name="getSpaceFollows")
-    op_follows = op.follows(where={"space": space_id}, first=10e5)
-    op_follows.follower()
-    return run_operation(op).follows
+    def get_follows_page(skip: int):
+        op = Operation(ss.Query, name="getSpaceFollows")
+        op_follows = op.follows(first=1000, skip=skip, where={"space": space_id})
+        op_follows.follower()
+        return run_operation(op).follows
+
+    skip = 0
+    page = get_follows_page(skip)
+    follows = [*page]
+    while len(page) > 0:
+        skip += 1000
+        page = get_follows_page(skip)
+        follows.extend(page)
+
+    return follows
 
 
 def get_spaces():
