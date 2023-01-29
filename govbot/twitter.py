@@ -12,7 +12,7 @@ from govbot.snapshot_schema import snapshot_schema as ss
 
 
 def enqueue_status_update_tweets(in_reply_to_status_id: str, proposal: ss.Proposal):
-    handler_url = "https://us-central1-static-174201.cloudfunctions.net/reply-tweet-hook "
+    handler_url = "https://us-central1-static-174201.cloudfunctions.net/reply-tweet-hook"
     payload = {
         "proposal_id": proposal.id,
         "func_name": "vote_update_status",
