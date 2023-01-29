@@ -1,6 +1,6 @@
 import json
 import datetime
-from typing import Optional, List, Dict
+from typing import Callable, Optional, List, Dict
 from collections import Counter
 
 import requests
@@ -120,42 +120,38 @@ def get_latest_proposals() -> list[ss.Proposal]:
     return run_operation(op).proposals
 
 
+def get_paginated(fetch_func: Callable, page_size: int) -> list:
+    skip = 0
+    results = []
+    while True:
+        page = fetch_func(page_size, skip)
+        if not page or len(page) == 0:
+            break
+
+        skip += page_size
+        results.extend(page)
+
+    return results
+
+
 def get_space_follows(space_id: str) -> list[ss.Follow]:
-    def get_follows_page(skip: int):
+    def get_follows_page(page_size: int, skip: int):
         op = Operation(ss.Query, name="getSpaceFollows")
-        op_follows = op.follows(first=1000, skip=skip, where={"space": space_id})
+        op_follows = op.follows(first=page_size, skip=skip, where={"space": space_id})
         op_follows.follower()
         return run_operation(op).follows
 
-    skip = 0
-    page = get_follows_page(skip)
-    follows = [*page]
-    while len(page) > 0:
-        skip += 1000
-        page = get_follows_page(skip)
-        follows.extend(page)
-
-    return follows
+    return get_paginated(get_follows_page, 1000)
 
 
 def get_spaces():
-    """API limits each request to 100 spaces"""
-
-    def get_space_page(skip: int):
+    def get_space_page(page_size: int, skip: int):
         op = Operation(ss.Query, name="getSpaces")
-        op_space = op.spaces(first=100, skip=skip)
+        op_space = op.spaces(first=page_size, skip=skip)
         op_space.id()
         return run_operation(op).spaces
 
-    skip = 0
-    page = get_space_page(skip)
-    spaces = [*page]
-    while len(page) > 0:
-        skip += 100
-        page = get_space_page(skip)
-        spaces.extend(page)
-
-    return spaces
+    return get_paginated(get_space_page, 100)
 
 
 def get_week_summary() -> dict:
