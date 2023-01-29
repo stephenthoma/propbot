@@ -10,6 +10,7 @@ PROBLEMS:
 """
 
 import os
+import json
 import base64
 from hashlib import sha256
 
@@ -43,6 +44,15 @@ def reply_tweet_entry(req):
 def webhook_entry(req):
     """Entrypoint for the webhook based cloud function"""
     if sha256(req.json.get("secret").encode("utf-8")) != os.environ["SNAPSHOT_SECRET"]:
+        print(
+            json.dumps(
+                dict(
+                    severity="ERROR",
+                    message="Received incorrect secret",
+                    received_secret=req.json.get("secret"),
+                )
+            )
+        )
         return flask.Response(status=401)
 
     proposal_id = req.json["id"].split("proposal/")[1]
