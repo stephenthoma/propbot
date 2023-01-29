@@ -43,12 +43,13 @@ def reply_tweet_entry(req):
 
 def webhook_entry(req):
     """Entrypoint for the webhook based cloud function"""
-    if sha256(req.json.get("secret").encode("utf-8")) != os.environ["SNAPSHOT_SECRET"]:
+    secret = sha256(req.json.get("secret").encode("utf-8")).hexdigest()
+    if secret != os.environ["SNAPSHOT_SECRET"]:
         print(
             json.dumps(
                 dict(
                     severity="ERROR",
-                    message="Received incorrect secret",
+                    message="Received unauthorized secret",
                     received_secret=req.json.get("secret"),
                 )
             )
