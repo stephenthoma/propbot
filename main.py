@@ -1,16 +1,4 @@
-"""
-IDEAS:
-    - monthly summary
-    - add sum of new spaces to summary
-    - tweet about proposals that have lots of discussion on twitter
-    - consider adding cashtags to tweets?
-PROBLEMS:
-    - has_already_tweeted_prop filter will prevent high activity / contested tweets for props that
-      were tweeted about at creation time
-"""
-
 import os
-import json
 import base64
 from hashlib import sha256
 
@@ -19,6 +7,7 @@ import flask
 from govbot import proposal_filters as pf
 from govbot import firestore
 from govbot import snapshot
+from govbot import log
 from govbot.twitter import GovTweeter, enqueue_status_update_tweets
 
 
@@ -45,14 +34,10 @@ def webhook_entry(req):
     """Entrypoint for the webhook based cloud function"""
     secret = sha256(req.json.get("secret").encode("utf-8")).hexdigest()
     if secret != os.environ["SNAPSHOT_SECRET"]:
-        print(
-            json.dumps(
-                dict(
-                    severity="ERROR",
-                    message="Received unauthorized secret",
-                    received_secret=req.json.get("secret"),
-                )
-            )
+        log.send_msg(
+            severity="ERROR",
+            message="Received unauthorized secret",
+            received_secret=req.json.get("secret"),
         )
         return flask.Response(status=401)
 

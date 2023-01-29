@@ -1,3 +1,4 @@
+from . import log
 from .snapshot import *
 from .twitter import *
 from .queue import *
