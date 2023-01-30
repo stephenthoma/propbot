@@ -7,7 +7,7 @@ import flask
 from govbot import proposal_filters as pf
 from govbot import firestore
 from govbot import snapshot
-from govbot import log
+from govbot import logger
 from govbot.twitter import GovTweeter, enqueue_status_update_tweets
 
 
@@ -34,7 +34,7 @@ def webhook_entry(req):
     """Entrypoint for the webhook based cloud function"""
     secret = sha256(req.json.get("secret").encode("utf-8")).hexdigest()
     if secret != os.environ["SNAPSHOT_SECRET"]:
-        log.send_msg(
+        logger.send_msg(
             severity="ERROR",
             message="Received unauthorized secret",
             received_secret=req.json.get("secret"),
@@ -119,21 +119,3 @@ def high_activity_cron():
     for prop in filtered_proposals:
         status = gov_tweeter.high_activity_proposal_status(prop)
         gov_tweeter.update_twitter_status(status)
-
-
-def _dev_get_new():
-    from collections import namedtuple
-
-    Req = namedtuple("request", "json")
-
-    new_proposals = snapshot.get_latest_proposals()
-    for proposal in new_proposals:
-        req = Req(json={"id": f"proposal/{proposal.id}"})
-        webhook_entry(req)
-
-
-if __name__ == "__main__":
-    _dev_get_new()
-    # contested_cron()
-    # high_activity_cron()
-    # print(snapshot.get_week_summary())

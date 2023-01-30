@@ -1,4 +1,4 @@
-from . import log
+from .logger import *
 from .snapshot import *
 from .twitter import *
 from .queue import *

@@ -5,6 +5,8 @@ import json
 from google.cloud import tasks_v2
 from google.protobuf import timestamp_pb2
 
+from govbot import logger
+
 
 def enqueue_task(queue_name: str, handler_url: str, payload: dict, execute_in_seconds: int):
     """Create a task for a given queue with an arbitrary payload."""
@@ -13,7 +15,7 @@ def enqueue_task(queue_name: str, handler_url: str, payload: dict, execute_in_se
     location = "us-central1"
     project = os.environ["GCP_PROJECT"]
 
-    # Construct the fully qualified queue name.
+    # Construct the fully qualified queue name
     parent = client.queue_path(project, location, queue_name)
 
     # Construct the request body.
@@ -24,7 +26,7 @@ def enqueue_task(queue_name: str, handler_url: str, payload: dict, execute_in_se
     timestamp.FromDatetime(d)
     task = {
         "schedule_time": timestamp,
-        "http_request": {  # Specify the type of request.
+        "http_request": {
             "http_method": tasks_v2.HttpMethod.POST,
             "url": handler_url,  # The full url path that the task will be sent to.
             "headers": {"Content-type": "application/json"},
@@ -32,7 +34,6 @@ def enqueue_task(queue_name: str, handler_url: str, payload: dict, execute_in_se
         },
     }
 
-    # Use the client to build and send the task.
     response = client.create_task(request={"parent": parent, "task": task})
 
-    print("Created task {}".format(response.name))
+    logger.send_msg("Created task {}".format(response.name), severity="info")

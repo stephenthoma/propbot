@@ -8,7 +8,7 @@ from requests.adapters import HTTPAdapter
 from requests.packages.urllib3.util.retry import Retry
 from sgqlc.operation import Operation
 from govbot.snapshot_schema import snapshot_schema as ss
-from govbot import log
+from govbot import logger
 
 SNAPSHOT_GRAPH_URL = "https://hub.snapshot.org/graphql"
 SNAPSHOT_SCORE_API = "https://score.snapshot.org/api/scores"
@@ -21,7 +21,8 @@ PROPOSAL_FIELDS = [
     "id",
     "network",
     "scores",
-    "scores_total" "snapshot",
+    "scores_total",
+    "snapshot",
     "start",
     "state",
     "strategies",
@@ -41,7 +42,7 @@ def get_proposal_results(proposal: ss.Proposal) -> Optional[Dict[str, float]]:
     """Calculate the results of a proposal by retrieving all votes, then requesting scores
 
     Returns:
-        dict: The keys are the proposal choices, values are the sum of votes for each choice
+        dict: The keys are the proposal choices, values are the sum of vote scores for each choice
     """
     if proposal.votes == 0:
         return None
@@ -54,7 +55,7 @@ def get_ending_proposals() -> list[ss.Proposal]:
     op = Operation(ss.Query, name="getEndingProposals")
     day_after_tomorrow = int((datetime.datetime.now() + datetime.timedelta(days=2)).timestamp())
 
-    op_proposals = op.proposals(
+    op_proposals: Any = op.proposals(
         first=100,
         where={"state": "active", "end_lte": day_after_tomorrow},
         order_by="end",
@@ -67,7 +68,7 @@ def get_ending_proposals() -> list[ss.Proposal]:
 
 def get_proposal(proposal_id: str) -> ss.Proposal:
     op = Operation(ss.Query, name="getProposal")
-    op_proposal = op.proposal(id=proposal_id)
+    op_proposal: Any = op.proposal(id=proposal_id)
     op_proposal.__fields__(*PROPOSAL_FIELDS)
     op_proposal.space().__fields__(*PROPOSAL_SPACE_FIELDS)
     op_proposal.strategies().__fields__("name", "params")
@@ -76,22 +77,12 @@ def get_proposal(proposal_id: str) -> ss.Proposal:
 
 def get_latest_proposals() -> list[ss.Proposal]:
     op = Operation(ss.Query, name="getProposals")
-    op_proposals = op.proposals(
+    op_proposals: Any = op.proposals(
         first=25, where={"state": "open"}, order_by="created", order_direction="desc"
     )
     op_proposals.__fields__(*PROPOSAL_FIELDS)
     op_proposals.space().__fields__(*PROPOSAL_SPACE_FIELDS)
     return run_operation(op).proposals
-
-
-def get_votes(proposal_id: str) -> list[ss.Vote]:
-    def get_votes_page(page_size: int, skip: int):
-        op = Operation(ss.Query)
-        op_votes = op.votes(first=page_size, skip=skip, where={"proposal": proposal_id})
-        op_votes.__fields__("choice", "voter")
-        return run_operation(op).votes
-
-    return get_paginated(get_votes_page, 1000)
 
 
 def get_spaces():
@@ -181,9 +172,9 @@ def run_query(
 
     retry_strategy = Retry(
         total=3,
-        backoff_factor=2,
+        backoff_factor=1,
         status_forcelist=[429, 500, 502, 503, 504],
-        method_whitelist=["OPTIONS", "POST"],
+        allowed_methods=["OPTIONS", "POST"],
     )
     adapter = HTTPAdapter(max_retries=retry_strategy)
     session = requests.Session()
@@ -194,7 +185,7 @@ def run_query(
     try:
         res.raise_for_status()
     except requests.HTTPError as err:
-        log.send_msg(
+        logger.send_msg(
             severity="ERROR",
             message="Got bad status code in GraphQL query response",
             error_message=res.text,
