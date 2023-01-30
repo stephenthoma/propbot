@@ -29,6 +29,7 @@ def enqueue_task(queue_name: str, handler_url: str, payload: dict, execute_in_se
         "http_request": {
             "http_method": tasks_v2.HttpMethod.POST,
             "url": handler_url,  # The full url path that the task will be sent to.
+            "oidcToken": {"serviceAccountEmail": "propbot@static-174201.iam.gserviceaccount.com"},
             "headers": {"Content-type": "application/json"},
             "body": payload_bytes,
         },
