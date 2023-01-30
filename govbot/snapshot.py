@@ -29,7 +29,7 @@ PROPOSAL_FIELDS = [
     "votes",
 ]
 PROPOSAL_SPACE_FIELDS = [
-    "followersCount",
+    "followers_count",
     "id",
     "members",
     "name",
