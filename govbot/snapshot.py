@@ -1,11 +1,10 @@
-import json
 import datetime
-from typing import Callable, Optional, Dict
+from typing import Callable, Optional, Dict, Any
 from collections import Counter
 
 import requests
 from requests.adapters import HTTPAdapter
-from requests.packages.urllib3.util.retry import Retry
+from urllib3.util.retry import Retry
 from sgqlc.operation import Operation
 from govbot.snapshot_schema import snapshot_schema as ss
 from govbot import logger
@@ -98,44 +97,83 @@ def get_spaces():
 def get_week_summary() -> dict:
     """Get a summary of activity on the snapshot platform from the last week"""
     a_week_ago = int((datetime.datetime.now() - datetime.timedelta(days=7)).timestamp())
-    op = Operation(ss.Query)
 
-    op_proposals: typing.Any = op.proposals(where={"created_gte": a_week_ago}, first=10e5)
-    op_proposals.id()
+    def get_new_proposals(page_size: int, skip: int):
+        op = Operation(ss.Query)
+        op_proposals: Any = op.proposals(
+            first=page_size, skip=skip, where={"created_gte": a_week_ago}
+        )
+        op_proposals.id()
+        return run_operation(op).proposals
 
-    op_follows = op.follows(where={"created_gte": a_week_ago}, first=10e5)
-    op_follows.space().id()
-    op_follows.space().name()
+    def get_new_follows(page_size: int, skip: int):
+        op = Operation(ss.Query)
+        op_follows: Any = op.follows(first=page_size, skip=skip, where={"created_gte": a_week_ago})
+        op_follows.space().__fields__("id", "name")
+        return run_operation(op).follows
 
-    res = run_operation(op)
+    proposals_res = get_paginated(get_new_proposals, 1000)
+    follows_res = get_paginated(get_new_follows, 1000)
 
-    counts = Counter([f.space.name for f in res.follows])
+    counts = Counter([f.space.name for f in follows_res])
     return {
         "num_votes": get_count_weeks_votes(),
-        "num_proposals": len(res.proposals),
+        "num_proposals": len(proposals_res),
         "top_growth_spaces": counts.most_common(3),
     }
 
 
-def get_count_weeks_votes() -> int:
-    """The API caps results at 100,000. So split into multiple queries and sum"""
+def get_votes_from_timespan(start, end):
+    start_stamp = int(start.timestamp())
+    end_stamp = int(end.timestamp())
+    page_size = 1000
+    skip = 0
+    votes = []
 
-    def get_votes_from_timespan(start, end):
-        start_stamp = int(start.timestamp())
-        end_stamp = int(end.timestamp())
+    while True:
         op = Operation(ss.Query)
-        op_vote = op.votes(where={"created_gte": start_stamp, "created_lte": end_stamp}, first=10e4)
-        op_vote.id()
-        res = run_operation(op)
-        return res.votes
+        op_vote = op.votes(
+            first=page_size,
+            skip=skip,
+            where={"created_gte": start_stamp, "created_lte": end_stamp},
+        )
+        op_vote.__fields__("id")
+        page = run_operation(op)
+
+        if not page or "errors" in page or not page.votes or len(page.votes) == 0:
+            if "errors" in page:
+                logger.send_msg(
+                    "Error while fetching votes from timespan",
+                    severity="WARNING",
+                    error_message=page["errors"],
+                )
+            break
+
+        skip += page_size
+        votes.extend(page.votes)
+    return votes
+
+
+def subdivide_date_range(start_time, end_time, count) -> list:
+    res = []
+
+    diff = (end_time - start_time) // count
+    for idx in range(0, count):
+        res.append((start_time + idx * diff))
+
+    return res
+
+
+def get_count_weeks_votes() -> int:
+    """The API caps results at 5000 per time range. So split into multiple queries and sum"""
 
     vote_sum = 0
-    end_time = datetime.datetime.now()
-    for day_offset in range(1, 8):
-        start_time = end_time - datetime.timedelta(days=day_offset)
+    week_end_time = datetime.datetime.now()
+    week_start_time = week_end_time - datetime.timedelta(days=7)
+    time_chunks = subdivide_date_range(week_start_time, week_end_time, 21)
+    for i, start_time in enumerate(time_chunks[:-1]):
+        end_time = time_chunks[i + 1]
         days_votes = len(get_votes_from_timespan(start_time, end_time))
-        if days_votes == 10e4:
-            print("Warning: Vote retrieval likely hit API limit")
 
         vote_sum += days_votes
         end_time = start_time

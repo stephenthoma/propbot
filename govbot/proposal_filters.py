@@ -34,7 +34,7 @@ def has_already_tweeted_prop(proposal: ss.Proposal) -> bool:
 
 
 def is_old_proposal(proposal):
-    """Where old == created more than 15 minutes ago"""
+    """Where 'old' is defined as a proposal created more than 15 minutes ago"""
     return (datetime.now() - datetime.fromtimestamp(proposal.created)).seconds > 9000
 
 
@@ -51,7 +51,7 @@ def is_not_contested_proposal(proposal: ss.Proposal) -> bool:
     if vote_sum == 0.0:
         return True
 
-    if len(results) == 1:
+    if len(results.keys()) == 1:
         # Edge case where all of the proposal choices are the same string
         return True
 
