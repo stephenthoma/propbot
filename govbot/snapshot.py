@@ -88,10 +88,10 @@ def get_spaces():
     def get_space_page(page_size: int, skip: int):
         op = Operation(ss.Query, name="getSpaces")
         op_space = op.spaces(first=page_size, skip=skip)
-        op_space.__fields__("id")
+        op_space.__fields__("id", "proposals_count")
         return run_operation(op).spaces
 
-    return get_paginated(get_space_page, 100)
+    return get_paginated(get_space_page, 1000)
 
 
 def get_week_summary() -> dict:

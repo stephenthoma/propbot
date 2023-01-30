@@ -13,6 +13,11 @@ from govbot.twitter import GovTweeter, enqueue_status_update_tweets
 
 def reply_tweet_entry(req):
     if req.json.get("secret") != os.environ["APP_SECRET"]:
+        logger.send_msg(
+            severity="ERROR",
+            message="Received unauthorized secret",
+            received_secret=req.json.get("secret"),
+        )
         return flask.Response(status=401)
 
     proposal_id = req.json["proposal_id"]

@@ -1,29 +1,36 @@
 import json
+import typing
+import statistics
+
+from sgqlc.operation import Operation
 
 from govbot import snapshot, firestore
+from govbot.snapshot_schema import snapshot_schema as ss
 
 
-spaceProposalsQuery = """
-query Proposals($id: String) {
-  proposals( where: {space: $id} ) { id }
-}
-"""
+def get_space_proposals(space_id: str, proposal_fields: list) -> typing.List[ss.Proposal]:
+    def get_proposal_page(page_size: int, skip: int):
+        op = Operation(ss.Query, name="getSpaceProposals")
+        op_proposal = op.proposals(first=page_size, skip=skip, where={"space": space_id})
+        op_proposal.__fields__(*proposal_fields)
+        return snapshot.run_operation(op).proposals
+
+    return snapshot.get_paginated(get_proposal_page, 1000)
 
 
-with open("./all_spaces.json", "r") as spacefi:
-    space_json = json.load(spacefi)["data"]
+if __name__ == "__main__":
+    spaces = snapshot.get_spaces()
+    filtered_spaces = [s for s in spaces if s.proposals_count > 3]
+    for space in filtered_spaces:
+        print(space.proposals_count, "proposals")
 
-for space in space_json["spaces"]:
+        proposals = get_space_proposals(space.id, ["id", "votes"])
+        prop_votes = [p.votes for p in proposals]
 
-    vars = {"id": space["id"]}
-    res = snapshot.run_query(spaceProposalsQuery, snapshot.SNAPSHOT_GRAPH_URL, variables=vars)
-    proposals = res["data"]["proposals"]
-    if len(proposals) < 3:
-        continue
+        avg_num_votes = statistics.median(prop_votes)
+        stdev_num_votes = statistics.pstdev(prop_votes)
 
-    prop_votes = [len(snapshot.get_votes(p["id"])) for p in proposals]
-    avg_votes = sum(prop_votes) / len(prop_votes)
-    if avg_votes != 0.0:
-        print(space["id"], avg_votes)
-        firestore.store_space_avg_voters(space["id"], avg_votes)
-        firestore.get_avg_space_voters(space["id"])
+        if avg_num_votes != 0.0:
+            # stored_num_votes = firestore.get_avg_space_voters(space.id)
+            print(space.id, avg_num_votes)
+            firestore.store_space_avg_voters(space.id, avg_num_votes)

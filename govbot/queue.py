@@ -36,4 +36,8 @@ def enqueue_task(queue_name: str, handler_url: str, payload: dict, execute_in_se
 
     response = client.create_task(request={"parent": parent, "task": task})
 
-    logger.send_msg("Created task {}".format(response.name), severity="info")
+    logger.send_msg(
+        "Created task {}".format(response.name),
+        severity="info",
+        payload={k: v for k, v in payload.items() if k != "secret"},
+    )

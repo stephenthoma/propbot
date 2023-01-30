@@ -2,6 +2,8 @@ import os
 
 from google.cloud import firestore
 
+from govbot import logger
+
 GCP_PROJECT = os.environ["GCP_PROJECT"]
 
 CONTESTED_COLLECTION = "contested_tweets"
@@ -12,14 +14,16 @@ def get_avg_space_voters(space_id: str) -> float:
     """Retrieve previously computed average voters for a space
 
     NOTE: If a record isn't found for a space, returns a very high average to
-    excluce the space from high activity consideration
+    exclude the space from high activity consideration
     """
     db = firestore.Client(project=GCP_PROJECT)
     doc_val = db.collection(AVG_SPACE_COLLECTION).document(space_id).get()
     if doc_val.exists is True:
         return doc_val.to_dict()["avg_voters"]
     else:
-        print(f"Error: Did not have average space voters stored for {space_id}")
+        logger.send_msg(
+            f"Did not have average space voters stored for {space_id}", severity="WARNING"
+        )
         return 10000.0
 
 
