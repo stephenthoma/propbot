@@ -58,7 +58,7 @@ def webhook_entry(req):
             break
     else:
         # Only tweet new proposals from top spaces (for now) to avoid spam
-        if len(proposal.space.followerCount) > 1000:
+        if proposal.space.followers_count > 1000:
             status = gov_tweeter.update_twitter_status(gov_tweeter.new_proposal_status(proposal))
             if status:
                 enqueue_status_update_tweets(status.id, proposal)

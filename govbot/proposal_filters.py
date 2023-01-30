@@ -94,7 +94,7 @@ def is_non_member_author(proposal: ss.Proposal) -> bool:
 
 
 def is_low_follower_space(proposal: ss.Proposal) -> bool:
-    return len(proposal.space.followerCount) < 100
+    return proposal.space.followers_count < 100
 
 
 def has_blocked_words(proposal: ss.Proposal) -> bool:
