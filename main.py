@@ -28,9 +28,10 @@ def reply_tweet_entry(req):
 
     gov_tweeter = GovTweeter()
     status = getattr(gov_tweeter, tweet_str_func_name)(proposal)
-    gov_tweeter.update_twitter_status(
-        status, in_reply_to_status_id, auto_populate_reply_metadata=True
-    )
+    if status is not None:
+        gov_tweeter.update_twitter_status(
+            status, in_reply_to_status_id, auto_populate_reply_metadata=True
+        )
 
     return flask.Response(status=200)
 

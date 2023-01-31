@@ -40,11 +40,16 @@ class GovTweeter:
         auth.set_access_token(ACCESS_TOKEN, ACCESS_SECRET)
         return tweepy.API(auth)
 
-    def vote_update_status(self, proposal: ss.Proposal) -> str:
+    def vote_update_status(self, proposal: ss.Proposal) -> Optional[str]:
         """Create a string for a reply tweet updating on the proposal's votes"""
         results = snapshot.get_proposal_results(proposal)
+        if not results:
+            return None
+
+        now = datetime.datetime.now().timestamp()
+        pct_complete = round(100 - (proposal.end - now) / (proposal.end - proposal.start) * 100, 0)
         # TODO: make it pretty
-        return str(results)
+        return f"⏰[{int(pct_complete)}% update]\n {chr(10).join([f'{k}: {v}' for k,v in results.items()])}"
 
     def new_proposal_status(self, proposal: ss.Proposal) -> str:
         """Create a string for a tweet about a new proposal"""
