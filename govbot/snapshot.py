@@ -19,6 +19,7 @@ PROPOSAL_FIELDS = [
     "end",
     "id",
     "network",
+    "quorum",
     "scores",
     "scores_total",
     "snapshot",
