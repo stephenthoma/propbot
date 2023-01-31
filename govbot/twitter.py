@@ -18,8 +18,9 @@ def enqueue_status_update_tweets(in_reply_to_status_id: str, proposal: ss.Propos
         "func_name": "vote_update_status",
         "in_reply_to_status_id": in_reply_to_status_id,
     }
-    proposal_half_complete_secs = int((proposal.end - proposal.start) / 2)
-    proposal_complete_secs = int(proposal.end - proposal.start)
+
+    proposal_half_complete_secs = _secs_to_pct_complete(proposal.start, proposal.end, 0.5)
+    proposal_complete_secs = _secs_to_pct_complete(proposal.start, proposal.end, 1.0)
 
     queue.enqueue_task("followup-tweet-queue", handler_url, payload, proposal_half_complete_secs)
     queue.enqueue_task("followup-tweet-queue", handler_url, payload, proposal_complete_secs)
@@ -48,6 +49,7 @@ class GovTweeter:
 
         now = datetime.datetime.now().timestamp()
         pct_complete = round(100 - (prop.end - now) / (prop.end - prop.start) * 100, 0)
+        pct_complete = int(min(pct_complete, 100))
 
         longest_choice_len = max(len(c) for c in results.keys()) + 1
         vote_pcts_str = "\n".join(
@@ -93,12 +95,12 @@ class GovTweeter:
         stats = snapshot.get_week_summary()
 
         return (
-            f'📈 [weekly summary]\n- {stats["num_proposals"]:,} new proposals'
-            f'\n- {stats["num_votes"]:,} votes cast\n\n'
+            f"📈 [weekly summary]\n- {stats.num_proposals:,} new proposals"
+            f"\n- {stats.num_votes:,} votes cast\n\n"
             f"Fastest growing spaces:\n"
-            f'- {stats["top_growth_spaces"][0][0]}: +{stats["top_growth_spaces"][0][1]:,} followers\n'
-            f'- {stats["top_growth_spaces"][1][0]}: +{stats["top_growth_spaces"][1][1]:,} followers\n'
-            f'- {stats["top_growth_spaces"][2][0]}: +{stats["top_growth_spaces"][2][1]:,} followers'
+            f"- {stats.top_growth_spaces[0][0]}: +{stats.top_growth_spaces[0][1]:,} followers\n"
+            f"- {stats.top_growth_spaces[1][0]}: +{stats.top_growth_spaces[1][1]:,} followers\n"
+            f"- {stats.top_growth_spaces[2][0]}: +{stats.top_growth_spaces[2][1]:,} followers"
         )
 
     def update_twitter_status(
@@ -137,3 +139,12 @@ def _get_space_name(proposal: ss.Proposal) -> str:
         return f"@{proposal.space.twitter}"
     else:
         return proposal.space.name
+
+
+def _secs_to_pct_complete(start_time: int, end_time: int, pct_complete: float) -> int:
+    assert pct_complete >= 0 and pct_complete <= 1.0
+    current_time = datetime.datetime.now().timestamp()
+
+    total_duration = end_time - start_time
+    target_duration = total_duration * pct_complete
+    return int(start_time + target_duration - current_time)

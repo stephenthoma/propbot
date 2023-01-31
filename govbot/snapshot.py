@@ -1,6 +1,7 @@
 import datetime
 from typing import Callable, Optional, Dict, Any
 from collections import Counter
+from dataclasses import dataclass
 
 import requests
 from requests.adapters import HTTPAdapter
@@ -95,7 +96,14 @@ def get_spaces():
     return get_paginated(get_space_page, 1000)
 
 
-def get_week_summary() -> dict:
+@dataclass
+class WeeklyStats:
+    num_votes: int
+    num_proposals: int
+    top_growth_spaces: list
+
+
+def get_week_summary() -> WeeklyStats:
     """Get a summary of activity on the snapshot platform from the last week"""
     a_week_ago = int((datetime.datetime.now() - datetime.timedelta(days=7)).timestamp())
 
@@ -117,11 +125,11 @@ def get_week_summary() -> dict:
     follows_res = get_paginated(get_new_follows, 1000)
 
     counts = Counter([f.space.name for f in follows_res])
-    return {
-        "num_votes": get_count_weeks_votes(),
-        "num_proposals": len(proposals_res),
-        "top_growth_spaces": counts.most_common(3),
-    }
+    return WeeklyStats(
+        num_votes=get_count_weeks_votes(),
+        num_proposals=len(proposals_res),
+        top_growth_spaces=counts.most_common(3),
+    )
 
 
 def get_votes_from_timespan(start, end):
@@ -155,23 +163,13 @@ def get_votes_from_timespan(start, end):
     return votes
 
 
-def subdivide_date_range(start_time, end_time, count) -> list:
-    res = []
-
-    diff = (end_time - start_time) // count
-    for idx in range(0, count):
-        res.append((start_time + idx * diff))
-
-    return res
-
-
 def get_count_weeks_votes() -> int:
     """The API caps results at 5000 per time range. So split into multiple queries and sum"""
 
     vote_sum = 0
     week_end_time = datetime.datetime.now()
     week_start_time = week_end_time - datetime.timedelta(days=7)
-    time_chunks = subdivide_date_range(week_start_time, week_end_time, 21)
+    time_chunks = _subdivide_date_range(week_start_time, week_end_time, 21)
     for i, start_time in enumerate(time_chunks[:-1]):
         end_time = time_chunks[i + 1]
         days_votes = len(get_votes_from_timespan(start_time, end_time))
@@ -232,3 +230,13 @@ def run_query(
         raise err
 
     return res.json()
+
+
+def _subdivide_date_range(start_time, end_time, count) -> list:
+    res = []
+
+    diff = (end_time - start_time) // count
+    for idx in range(0, count):
+        res.append((start_time + idx * diff))
+
+    return res
