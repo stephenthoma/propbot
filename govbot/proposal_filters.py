@@ -84,9 +84,13 @@ def is_blocked_space(proposal: ss.Proposal) -> bool:
     The list of allowed spaces is all spaces with more than 3 proposals and >10 avg voters
     """
     with open(resource_filename("govbot", "allowed_spaces.json"), "r") as fi:
-        spaces = json.load(fi)
+        allowed_spaces = json.load(fi)
 
-    return proposal.space.id not in spaces
+    with open(resource_filename("govbot", "verified_spaces.json"), "r") as fi:
+        verified_spaces = json.load(fi)
+        blocked_spaces = [s for s, v in verified_spaces.items() if v == -1]
+
+    return proposal.space.id not in allowed_spaces or proposal.space.id in blocked_spaces
 
 
 def is_non_member_author(proposal: ss.Proposal) -> bool:
