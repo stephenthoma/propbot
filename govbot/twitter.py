@@ -51,21 +51,17 @@ class GovTweeter:
         pct_complete = round(100 - (prop.end - now) / (prop.end - prop.start) * 100, 0)
         pct_complete = int(min(pct_complete, 100))
 
-        longest_choice_len = max(len(c) for c in results.keys()) + 1
         vote_pcts_str = "\n".join(
-            [
-                f"{(k + ':').ljust(longest_choice_len)} {round(v / prop.scores_total * 100, 2)}%"
-                for k, v in results.items()
-            ]
+            [f"• {k}: {round(v / prop.scores_total * 100, 2)}%" for k, v in results.items()]
         )
         quorum_met_str = ""
         if prop.quorum != 0:
             if prop.scores_total > prop.quorum:
-                quorum_met_str = "☑️ quorum reached"
+                quorum_met_str = "(☑️ quorum reached)"
             elif prop.scores_total < prop.quorum:
-                quorum_met_str = "❌ quorum not reached"
+                quorum_met_str = "(❌ quorum not reached)"
 
-        return f"⏰[status update]\n\nVoting period {int(pct_complete)}% complete with {prop.votes} voters ({quorum_met_str})\n\n{vote_pcts_str}"
+        return f"⏰ [status update]\n\nVoting {int(pct_complete)}% complete with {prop.votes} voters {quorum_met_str}\n\n{vote_pcts_str}"
 
     def new_proposal_status(self, proposal: ss.Proposal) -> str:
         """Create a string for a tweet about a new proposal"""
