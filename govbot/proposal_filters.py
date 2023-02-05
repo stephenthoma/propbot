@@ -86,6 +86,7 @@ def is_blocked_space(proposal: ss.Proposal) -> bool:
     with open(resource_filename("govbot", "allowed_spaces.json"), "r") as fi:
         allowed_spaces = json.load(fi)
 
+    # https://raw.githubusercontent.com/snapshot-labs/snapshot-spaces/master/spaces/verified.json
     with open(resource_filename("govbot", "verified_spaces.json"), "r") as fi:
         verified_spaces = json.load(fi)
         blocked_spaces = [s for s, v in verified_spaces.items() if v == -1]

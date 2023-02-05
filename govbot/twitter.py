@@ -41,6 +41,15 @@ class GovTweeter:
         auth.set_access_token(ACCESS_TOKEN, ACCESS_SECRET)
         return tweepy.API(auth)
 
+    def _proposal_vote_pcts(self, proposal: ss.Proposal, num_choices=3) -> str:
+        results = snapshot.get_proposal_results(proposal, num_choices)
+        if not results:
+            return ""
+
+        return "\n".join(
+            [f"• {k}: {round(v / proposal.scores_total * 100, 2)}%" for k, v in results.items()]
+        )
+
     def vote_update_status(self, prop: ss.Proposal) -> Optional[str]:
         """Create a string for a reply tweet updating on the prop's votes"""
         results = snapshot.get_proposal_results(prop)
@@ -51,9 +60,6 @@ class GovTweeter:
         pct_complete = round(100 - (prop.end - now) / (prop.end - prop.start) * 100, 0)
         pct_complete = int(min(pct_complete, 100))
 
-        vote_pcts_str = "\n".join(
-            [f"• {k}: {round(v / prop.scores_total * 100, 2)}%" for k, v in results.items()]
-        )
         quorum_met_str = ""
         if prop.quorum != 0:
             if prop.scores_total > prop.quorum:
@@ -61,6 +67,7 @@ class GovTweeter:
             elif prop.scores_total < prop.quorum:
                 quorum_met_str = "(❌ quorum not reached)"
 
+        vote_pcts_str = self._proposal_vote_pcts(prop)
         return f"⏰ [status update]\n\nVoting {int(pct_complete)}% complete with {prop.votes} voters {quorum_met_str}\n\n{vote_pcts_str}"
 
     def new_proposal_status(self, proposal: ss.Proposal) -> str:
@@ -77,7 +84,8 @@ class GovTweeter:
         url = snapshot.get_proposal_url(proposal)
         name = _get_space_name(proposal)
 
-        return f'⚔️ [contested] {name} proposal: "{proposal.title}"\n\nVoting ends soon {end_date_str}\n{url}'
+        vote_pcts_str = self._proposal_vote_pcts(proposal)
+        return f'⚔️ [contested] {name} proposal: "{proposal.title}"\n\n{vote_pcts_str}\n\nVoting ends soon {end_date_str}\n{url}'
 
     def high_activity_proposal_status(self, proposal: ss.Proposal) -> str:
         """Create a string for a tweet about a contested proposal"""
@@ -85,7 +93,7 @@ class GovTweeter:
         url = snapshot.get_proposal_url(proposal)
         name = _get_space_name(proposal)
 
-        return f'🔥 [high activity] {name} proposal: "{proposal.title}"\n\nVoting ends {end_date_str}\n{url}'
+        return f'🔥 [high activity] {name} proposal: "{proposal.title}" ({proposal.votes} voters)\n\nVoting ends {end_date_str}\n{url}'
 
     def weekly_summary_status(self) -> str:
         stats = snapshot.get_week_summary()

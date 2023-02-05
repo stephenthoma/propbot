@@ -39,7 +39,9 @@ PROPOSAL_SPACE_FIELDS = [
 ]
 
 
-def get_proposal_results(proposal: ss.Proposal) -> Optional[Dict[str, float]]:
+def get_proposal_results(
+    proposal: ss.Proposal, num_choices: Optional[int]
+) -> Optional[Dict[str, float]]:
     """Calculate the results of a proposal by retrieving all votes, then requesting scores
 
     Returns:
@@ -48,8 +50,12 @@ def get_proposal_results(proposal: ss.Proposal) -> Optional[Dict[str, float]]:
     if proposal.votes == 0:
         return None
 
-    results = dict(zip(proposal.choices, proposal.scores))
-    return results
+    if not num_choices:
+        num_choices = len(proposal.choices)
+
+    # Sorted by score descending
+    choices = sorted(zip(proposal.choices, proposal.scores), key=lambda x: x[1], reverse=True)
+    return dict(choices[:num_choices])
 
 
 def get_ending_proposals() -> list[ss.Proposal]:
