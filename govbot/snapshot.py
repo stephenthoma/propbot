@@ -40,7 +40,7 @@ PROPOSAL_SPACE_FIELDS = [
 
 
 def get_proposal_results(
-    proposal: ss.Proposal, num_choices: Optional[int]
+    proposal: ss.Proposal, num_choices: Optional[int] = None
 ) -> Optional[Dict[str, float]]:
     """Calculate the results of a proposal by retrieving all votes, then requesting scores
 
